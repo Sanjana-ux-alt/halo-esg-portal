@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>HALO ESG — Stride Ventures</title>
+  <meta name="viewport" content="width=1440" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="esg/styles.css" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Order matters: data.jsx defines globals (HALO_ESG, Icon, StatusPill, Ring) first -->
+  <script type="text/babel" src="esg/data.jsx"></script>
+  <script type="text/babel" src="esg/scoring.jsx"></script>
+  <script type="text/babel" src="esg/shell.jsx"></script>
+  <script type="text/babel" src="esg/overview.jsx"></script>
+  <script type="text/babel" src="esg/builder.jsx"></script>
+  <script type="text/babel" src="esg/send.jsx"></script>
+  <script type="text/babel" src="esg/company.jsx"></script>
+  <script type="text/babel" src="esg/founder.jsx"></script>
+  <script type="text/babel" src="esg/review.jsx"></script>
+  <script type="text/babel" src="esg/report.jsx"></script>
+
+  <script type="text/babel">
+    const App = () => {
+      const [route, setRoute] = React.useState({ view: "overview", id: null });
+      window.HALO_NAV = (view, id = null) => setRoute({ view, id });
+
+      let screen = null;
+      switch (route.view) {
+        case "company": screen = <CompanyDetail companyId={route.id} />; break;
+        case "founder": screen = <FounderView companyId={route.id} />; break;
+        case "send":    screen = <SendSurvey />; break;
+        default:        screen = <Overview />; break;
+      }
+
+      // Founder view is the recipient-facing form — no internal sidebar.
+      const showSidebar = route.view !== "founder";
+      if (!showSidebar) return <div style={{minHeight: "100vh"}}>{screen}</div>;
+
+      return (
+        <div className="shell">
+          <Sidebar active="overview" />
+          <div className="main">{screen}</div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
