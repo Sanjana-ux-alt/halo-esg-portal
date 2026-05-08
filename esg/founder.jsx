@@ -115,9 +115,7 @@ const FounderView = ({ companyId }) => {
           </div>
         </div>
 
-        {/* 2-column layout: form + Ask ESG team */}
-        <div style={{display: "grid", gridTemplateColumns: "1fr 340px", gap: 22, alignItems: "start"}}>
-          <div>
+        <div>
             {grouped.map((g, gi) => (
               <div key={g.section} style={{background: "white", borderRadius: 14, boxShadow: "var(--halo-shadow)", marginBottom: 18, overflow: "hidden"}}>
                 <div style={{padding: "18px 24px", borderBottom: "1px solid var(--halo-line-2)", display: "flex", alignItems: "center", justifyContent: "space-between"}}>
@@ -205,69 +203,6 @@ const FounderView = ({ companyId }) => {
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Ask the ESG team — sticky right rail */}
-          <div style={{position: "sticky", top: 22, display: "flex", flexDirection: "column", gap: 14}}>
-            <div className="card card-pad">
-              <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 6}}>
-                <div style={{width: 32, height: 32, borderRadius: 8, background: "#E6E7F4", color: "#45489B", display: "grid", placeItems: "center"}}>
-                  <Icon name="help" size={15} />
-                </div>
-                <div>
-                  <div style={{fontSize: 14, fontWeight: 700}}>Ask the ESG team</div>
-                  <div style={{fontSize: 11, color: "var(--halo-text-3)"}}>Stuck on a question? They'll reply here.</div>
-                </div>
-              </div>
-              <textarea
-                value={draftQ}
-                onChange={e => setDraftQ(e.target.value)}
-                placeholder="e.g. For Scope 1+2, do we include our leased Mumbai office?"
-                style={{
-                  width: "100%", minHeight: 86, marginTop: 8,
-                  border: "1px solid var(--halo-line)", borderRadius: 9,
-                  padding: "10px 12px", fontSize: 13, fontFamily: "inherit",
-                  resize: "vertical", outline: "none", boxSizing: "border-box",
-                }}
-              />
-              <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, gap: 8}}>
-                <div style={{fontSize: 11, color: "var(--halo-text-3)"}}>Sent to Krishti Sharma</div>
-                <button className="btn btn-mint btn-sm" disabled={!draftQ.trim()} style={!draftQ.trim() ? {opacity:0.55,cursor:"not-allowed"} : {}} onClick={submitQ}>
-                  <Icon name="send" size={12} />Send question
-                </button>
-              </div>
-            </div>
-
-            {/* Existing thread */}
-            <div className="card card-pad">
-              <div style={{fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 12}}>
-                Your conversation ({thread.length})
-              </div>
-              {thread.length === 0 && (
-                <div style={{fontSize: 12.5, color: "var(--halo-text-3)", fontStyle: "italic", padding: "4px 0 4px"}}>
-                  No questions yet. Ask anything above and the ESG team will reply.
-                </div>
-              )}
-              {thread.map((t, i) => (
-                <div key={t.id} style={{padding: "12px 0", borderTop: i ? "1px solid var(--halo-line-2)" : "none"}}>
-                  <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4}}>
-                    <span style={{fontSize: 12, fontWeight: 700}}>You</span>
-                    <span style={{fontSize: 11, color: "var(--halo-text-3)"}}>{t.time}</span>
-                  </div>
-                  <div style={{fontSize: 13, color: "var(--halo-text)", lineHeight: 1.5}}>{t.q}</div>
-                  {t.status === 'answered' ? (
-                    <div style={{marginTop: 8, padding: "10px 12px", background: "#F2FBF7", borderRadius: 8, fontSize: 12.5, color: "var(--halo-text-2)", lineHeight: 1.5}}>
-                      <strong style={{color: "var(--halo-mint)"}}>{t.repliedBy || 'ESG team'} replied:</strong> {t.a}
-                    </div>
-                  ) : (
-                    <div style={{marginTop: 6, fontSize: 11, color: "#8E5F18", fontWeight: 600, letterSpacing: "0.04em"}}>
-                      <Icon name="clock" size={11} /> Waiting for ESG team reply
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
