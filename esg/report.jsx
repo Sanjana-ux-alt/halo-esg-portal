@@ -1,7 +1,12 @@
 // HALO ESG — Final Report
 
-// ── Pillar formula tooltip ──
-const PillarTip = ({ pillar, color, topics, sec }) => {
+// ── Detailed formula popover ──
+// Used for both pillar tiles (E/S/G) and the hero total-score row.
+// Click the (i) to open a navy panel that walks ESG through the full chain:
+//   response% → q_weight × response% → topic_weight × Σ → Σ topics → pillar/total
+// ───────────────────────────────────────────────────────────────────────────
+
+const FormulaTip = ({ kind, color, sec, scores, tier, threshold, anchor = "right" }) => {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   React.useEffect(() => {
@@ -10,36 +15,169 @@ const PillarTip = ({ pillar, color, topics, sec }) => {
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, [open]);
-  const rows = topics.filter(([k, t]) => (t.w[sec] || 0) > 0);
-  const maxPts = rows.reduce((s, [k, t]) => s + (t.w[sec] || 0), 0);
+
+  const SCORING = window.HALO_ESG.SCORING;
+  const TOPICS  = SCORING.TOPICS;
+  const ACTIVE  = SCORING.getActiveQuestions();
+
+  // ── Helpers ──
+  const topicsForPillar = (p) =>
+    Object.entries(TOPICS)
+      .filter(([k, t]) => t.pillar === p && (t.w[sec] || 0) > 0)
+      .map(([tk, t]) => {
+        const qs = ACTIVE.filter(q => q.topic === tk && !q.unscored && (!q.sectors || q.sectors.includes(sec)));
+        return { tk, name: t.name, weight: t.w[sec], count: qs.length };
+      });
+
+  // ── Content per kind ──
+  let title = "How it's scored";
+  let formulaLines = [];
+  let topicRows = [];
+  let footer = null;
+
+  if (kind === 'total') {
+    title = "How the total ESG score is calculated";
+    formulaLines = [
+      "Total = E + S + G",
+      "",
+      "Each pillar = Σ topic scores",
+      "Each topic  = topic_weight × Σ(q_weight × response%)",
+      "response%   ∈ {0, 25, 50, 75, 100}  (Excel bracket)",
+    ];
+    topicRows = [
+      { label: "Environment", v: scores.e, m: scores.maxE, c: "#22C28F" },
+      { label: "Social",      v: scores.s, m: scores.maxS, c: "#6B6FBF" },
+      { label: "Governance",  v: scores.g, m: scores.maxG, c: "#E8A33D" },
+    ];
+    const verdict = scores.total >= threshold ? 'PASS' : (scores.total >= threshold * 0.6 ? 'REVIEW' : 'FAIL');
+    const verdictColor = verdict === 'PASS' ? '#22C28F' : verdict === 'REVIEW' ? '#E8A33D' : '#E25C5C';
+    footer = (
+      <>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5,padding:"8px 0 6px",marginTop:6,borderTop:"2px solid rgba(255,255,255,0.18)"}}>
+          <span style={{color:"#ADB3CE",fontWeight:700}}>Total</span>
+          <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{scores.total} / 100</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+          <span style={{color:"#ADB3CE"}}>Tier {tier} · Pass ≥</span>
+          <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{threshold} / 100</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+          <span style={{color:"#ADB3CE"}}>Verdict</span>
+          <span style={{padding:"2px 9px",borderRadius:4,background:verdictColor+"33",color:verdictColor,fontWeight:800,letterSpacing:"0.1em"}}>{verdict}</span>
+        </div>
+      </>
+    );
+  } else {
+    // pillar kind: 'E' | 'S' | 'G'
+    const pillarName = kind === 'E' ? 'Environment' : kind === 'S' ? 'Social' : 'Governance';
+    title = `How ${pillarName} is scored`;
+    formulaLines = [
+      "Step 1  response% = Excel bracket lookup",
+      "        e.g. % women → 0% / 50% / 75% / 100%",
+      "",
+      "Step 2  q_score = q_weight × response%",
+      "",
+      "Step 3  topic_score = topic_weight × Σ q_score",
+      "        topic_weight = sector column in Excel",
+      "",
+      "Step 4  pillar_score = Σ topic_score",
+    ];
+    topicRows = topicsForPillar(kind);
+    const maxTotal = topicRows.reduce((s, r) => s + r.weight, 0);
+    const qTotal   = topicRows.reduce((s, r) => s + r.count, 0);
+    footer = (
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5,padding:"8px 0 0",marginTop:6,borderTop:"2px solid rgba(255,255,255,0.18)"}}>
+        <span style={{color,fontWeight:700}}>Max {pillarName}</span>
+        <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{maxTotal}pts · {qTotal}Q</span>
+      </div>
+    );
+  }
+
+  const anchorStyle = anchor === "right" ? {right: 0} : {left: 0};
+
   return (
-    <span ref={ref} style={{position:"relative",display:"inline-block",marginLeft:"auto"}}>
+    <span ref={ref} style={{position:"relative",display:"inline-block",marginLeft: kind === 'total' ? 6 : "auto"}}>
       <button type="button" onClick={e => { e.stopPropagation(); setOpen(!open); }}
-        style={{width:20,height:20,borderRadius:"50%",background:open?color:"#E6E7F4",color:open?"white":"#45489B",fontSize:11,fontWeight:800,fontFamily:"Figtree,sans-serif",display:"inline-grid",placeItems:"center",border:"none",cursor:"pointer"}}>
+        title="How is this score computed?"
+        style={{
+          width: kind === 'total' ? 18 : 20,
+          height: kind === 'total' ? 18 : 20,
+          borderRadius:"50%",
+          background: open ? (color || "var(--halo-navy)") : "#E6E7F4",
+          color: open ? "white" : "#45489B",
+          fontSize: kind === 'total' ? 10 : 11,
+          fontWeight:800, fontFamily:"Figtree,sans-serif",
+          display:"inline-grid", placeItems:"center",
+          border:"none", cursor:"pointer", verticalAlign: "middle",
+        }}>
         i
       </button>
       {open && (
-        <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:268,background:"var(--halo-navy)",color:"white",borderRadius:10,padding:"14px 16px",boxShadow:"0 12px 32px rgba(15,33,80,0.3)",zIndex:40,textAlign:"left"}}>
-          <div style={{fontSize:9,letterSpacing:"0.16em",textTransform:"uppercase",color,fontWeight:800,marginBottom:6}}>
-            How {pillar} is scored
+        <div style={{
+          position:"absolute", top:"calc(100% + 8px)", ...anchorStyle,
+          width: 360, background:"var(--halo-navy)", color:"white",
+          borderRadius:12, padding:"16px 18px",
+          boxShadow:"0 16px 40px rgba(15,33,80,0.35)", zIndex:40, textAlign:"left",
+        }}>
+          {/* Header */}
+          <div style={{fontSize:9.5,letterSpacing:"0.16em",textTransform:"uppercase",color: color || "var(--halo-mint)",fontWeight:800,marginBottom:8}}>
+            {title}
           </div>
-          <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:10.5,color:"#ADB3CE",marginBottom:10,lineHeight:1.6,background:"rgba(255,255,255,0.06)",borderRadius:6,padding:"6px 8px"}}>
-            topic_weight × Σ(q_weight × response%)
+
+          {/* Formula chain */}
+          <div style={{
+            fontFamily:"JetBrains Mono,monospace", fontSize:10.5, color:"#C5C9DD",
+            marginBottom:14, lineHeight:1.7, background:"rgba(255,255,255,0.06)",
+            borderRadius:7, padding:"10px 12px", whiteSpace:"pre-wrap",
+          }}>
+            {formulaLines.join("\n")}
           </div>
-          {rows.map(([k, t]) => (
-            <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5,padding:"5px 0",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
-              <span style={{color:"#C5C9DD"}}>{t.name}</span>
-              <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{t.w[sec]}pts</span>
-            </div>
-          ))}
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5,padding:"7px 0 0",marginTop:4,borderTop:"2px solid rgba(255,255,255,0.15)"}}>
-            <span style={{color,fontWeight:700}}>Max score</span>
-            <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{maxPts}pts</span>
+
+          {/* Topic / pillar table */}
+          <div style={{fontSize:9.5,letterSpacing:"0.14em",textTransform:"uppercase",color:"#8B91AB",fontWeight:700,marginBottom:6}}>
+            {kind === 'total' ? "Pillar breakdown" : `Topics in ${kind === 'E' ? 'Environment' : kind === 'S' ? 'Social' : 'Governance'} (this sector)`}
           </div>
+          {kind === 'total' ? (
+            topicRows.map((r, i) => {
+              const pct = r.m > 0 ? Math.round(r.v / r.m * 100) : 0;
+              return (
+                <div key={i} style={{padding:"7px 0",borderTop: i ? "1px solid rgba(255,255,255,0.07)" : "none"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5}}>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:6,color:"#C5C9DD"}}>
+                      <span style={{width:6,height:6,borderRadius:"50%",background:r.c}} />
+                      {r.label}
+                    </span>
+                    <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>
+                      {r.v} / {r.m} <span style={{color:"#8B91AB",fontWeight:500}}> · {pct}%</span>
+                    </span>
+                  </div>
+                  <div style={{height:3,background:"rgba(255,255,255,0.08)",borderRadius:99,overflow:"hidden",marginTop:5}}>
+                    <div style={{height:"100%",width: pct + "%", background: r.c, borderRadius:99}} />
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            topicRows.map((r, i) => (
+              <div key={r.tk} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5,padding:"6px 0",borderTop: i ? "1px solid rgba(255,255,255,0.07)" : "none"}}>
+                <span style={{color:"#C5C9DD",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",paddingRight:8}}>{r.name}</span>
+                <span style={{color:"#8B91AB",fontSize:10.5,fontFamily:"JetBrains Mono,monospace",marginRight:8}}>{r.count}Q</span>
+                <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace",minWidth:42,textAlign:"right"}}>{r.weight}pts</span>
+              </div>
+            ))
+          )}
+
+          {footer}
         </div>
       )}
     </span>
   );
+};
+
+// Back-compat: the pillar tiles below still mount this name.
+const PillarTip = ({ pillar, color, sec }) => {
+  const kind = pillar === 'Environment' ? 'E' : pillar === 'Social' ? 'S' : 'G';
+  return <FormulaTip kind={kind} color={color} sec={sec} />;
 };
 
 const Report = ({ companyId, embedded }) => {
@@ -55,6 +193,8 @@ const Report = ({ companyId, embedded }) => {
     ? { e: r1(computed.eP.s), s: r1(computed.sP.s), g: r1(computed.gP.s), total: r1(computed.total),
         maxE: r1(computed.eP.m), maxS: r1(computed.sP.m), maxG: r1(computed.gP.m) }
     : { e: 26.2, s: 28.1, g: 24.1, total: 78.4, maxE: 25, maxS: 39, maxG: 36 };
+  const tier = computed?.tier || 'L2';
+  const threshold = computed?.threshold || SCORING.PASS_THRESHOLDS[tier] || 30;
 
   // Topic lists per pillar (for formula tooltips)
   const eTopics = Object.entries(SCORING.TOPICS).filter(([k, t]) => t.pillar === 'E' && (t.w[sec] || 0) > 0);
@@ -109,7 +249,10 @@ const Report = ({ companyId, embedded }) => {
           <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24}}>
             <div style={{display: "flex", alignItems: "center", gap: 14}}>
               <div>
-                <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>Score</div>
+                <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, display: "flex", alignItems: "center"}}>
+                  Score
+                  <FormulaTip kind="total" sec={sec} scores={scores} tier={tier} threshold={threshold} anchor="left" />
+                </div>
                 <div className="mono" style={{fontSize: 30, fontWeight: 700, color: "#1B7C5E", letterSpacing: "-0.02em", lineHeight: 1.1}}>{scores.total} <span style={{fontSize: 14, color: "var(--halo-text-3)", fontWeight: 500}}>/100</span></div>
               </div>
             </div>
