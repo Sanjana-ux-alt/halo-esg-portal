@@ -457,8 +457,12 @@
     const sec = sectorKey(co.sector);
     const ans = (window.HALO_ESG.STATE.answers[companyId]) || {};
 
+    // Honour ESG's form-builder edits: skip disabled, include custom (which are unscored)
+    const disabledSet = new Set(window.HALO_ESG.STATE.disabledQuestions || []);
+    const activeQs = [...QUESTIONS.filter(q => !disabledSet.has(q.id)), ...(window.HALO_ESG.STATE.customQuestions || [])];
+
     const byTopic = {};
-    QUESTIONS.forEach(q => {
+    activeQs.forEach(q => {
       if (q.unscored) return;
       if (q.sectors && !q.sectors.includes(sec)) return;
       const tw = TOPICS[q.topic]?.w?.[sec];
@@ -483,7 +487,8 @@
       if (t.pillar==='S'){ sP.s+=t.scored; sP.m+=t.max; }
       if (t.pillar==='G'){ gP.s+=t.scored; gP.m+=t.max; }
     });
-    const tier = co.tier || tierFromAmount(co.amount);
+    // Tier priority: deal-team's explicit choice (from Send Survey) → company default → derived from amount
+    const tier = (window.HALO_ESG.STATE.companyTiers || {})[companyId] || co.tier || tierFromAmount(co.amount);
     const threshold = PASS_THRESHOLDS[tier] || 30;
     const r = (x) => Math.round(x*10)/10;
     return {
@@ -567,6 +572,9 @@
     customContacts: persisted.customContacts || {},
     sendDraft: persisted.sendDraft || null,
     qaQuestions: persisted.qaQuestions || {}, // { [companyId]: [{ id, from, q, time, status, a?, repliedBy? }] }
+    disabledQuestions: persisted.disabledQuestions || [], // master-form questions ESG has hidden
+    customQuestions:   persisted.customQuestions   || [], // extra questions ESG added on top of the Excel set
+    companyTiers:      persisted.companyTiers      || {}, // { [companyId]: 'L1' | 'L2' | 'L3' } set by deal team on send
   };
   const persist = () => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch {}
@@ -574,6 +582,30 @@
   const setAnswer = (cid, qid, val) => {
     if (!STATE.answers[cid]) STATE.answers[cid] = {};
     STATE.answers[cid][qid] = val;
+    persist();
+  };
+
+  // ── Form Builder helpers (ESG-only) ──
+  const getActiveQuestions = () => {
+    const disabled = new Set(STATE.disabledQuestions);
+    return [...QUESTIONS.filter(q => !disabled.has(q.id)), ...STATE.customQuestions];
+  };
+  const toggleQuestionDisabled = (qid) => {
+    const idx = STATE.disabledQuestions.indexOf(qid);
+    if (idx >= 0) STATE.disabledQuestions.splice(idx, 1);
+    else STATE.disabledQuestions.push(qid);
+    persist();
+  };
+  const addCustomQuestion = (q) => {
+    STATE.customQuestions.push({ ...q, custom: true, unscored: true });
+    persist();
+  };
+  const removeCustomQuestion = (qid) => {
+    STATE.customQuestions = STATE.customQuestions.filter(q => q.id !== qid);
+    persist();
+  };
+  const setCompanyTier = (cid, tier) => {
+    STATE.companyTiers[cid] = tier;
     persist();
   };
   // Founder asks a question that the ESG team will see in the Q&A tab.
@@ -603,13 +635,17 @@
   // 7. EXPORT to window.HALO_ESG.SCORING
   // ============================================================
   Object.assign(window.HALO_ESG, {
-    SCORING: { TOPICS, QUESTIONS, computeScores, scoreQuestion, sectorKey, tierFromAmount, PASS_THRESHOLDS },
+    SCORING: { TOPICS, QUESTIONS, computeScores, scoreQuestion, sectorKey, tierFromAmount, PASS_THRESHOLDS, getActiveQuestions },
     CONTACTS,
     STATE,
     persist,
     setAnswer,
     askQuestion,
     replyQuestion,
+    toggleQuestionDisabled,
+    addCustomQuestion,
+    removeCustomQuestion,
+    setCompanyTier,
   });
 
   // ============================================================

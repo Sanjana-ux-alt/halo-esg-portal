@@ -152,8 +152,8 @@ const Review = ({ companyId, embedded }) => {
   };
   const fmtPct = (x) => `${Math.round((x||0)*100)}%`;
 
-  // Every scored question for this sector, in section order.
-  const scoredQs = SCORING.QUESTIONS.filter(q => !q.unscored && (!q.sectors || q.sectors.includes(sec)));
+  // Every scored question for this sector, in section order. Uses the ESG-curated active list.
+  const scoredQs = SCORING.getActiveQuestions().filter(q => !q.unscored && (!q.sectors || q.sectors.includes(sec)));
   const Q_DATA = scoredQs.map(q => {
     const tw = SCORING.TOPICS[q.topic]?.w?.[sec] || 0;
     const max = (q.w || 0) * tw;

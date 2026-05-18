@@ -28,9 +28,9 @@ const FounderView = ({ companyId }) => {
     ? SCORING.sectorKey(sectorSelected)
     : null;
 
-  // Visible questions for the selected sector
+  // Visible questions for the selected sector (uses ESG-curated list: master − disabled + custom)
   const allQs = React.useMemo(
-    () => sec ? SCORING.QUESTIONS.filter(q => !q.sectors || q.sectors.includes(sec)) : [],
+    () => sec ? SCORING.getActiveQuestions().filter(q => !q.sectors || q.sectors.includes(sec)) : [],
     [sec, co.id]
   );
   // Group by section in original order

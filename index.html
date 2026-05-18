@@ -31,9 +31,9 @@
 
   <script type="text/babel">
     const ROLE_PERMS = {
-      esg:  { canReview: true,  canEdit: true,  canSend: true,  fullReport: true,  seeFormulas: true  },
-      deal: { canReview: false, canEdit: false,  canSend: true,  fullReport: true,  seeFormulas: false },
-      risk: { canReview: false, canEdit: false,  canSend: false, fullReport: false, seeFormulas: false },
+      esg:  { canReview: true,  canEdit: true,  canSend: true,  fullReport: true,  seeFormulas: true,  canEditForm: true  },
+      deal: { canReview: false, canEdit: false,  canSend: true,  fullReport: true,  seeFormulas: false, canEditForm: false },
+      risk: { canReview: false, canEdit: false,  canSend: false, fullReport: false, seeFormulas: false, canEditForm: false },
     };
 
     const App = () => {
@@ -70,6 +70,7 @@
         case "founder": screen = <FounderView   companyId={route.id} />; break;
         case "send":    screen = perms.canSend ? <SendSurvey /> : <Overview />; break;
         case "report":  screen = <Report companyId={route.id} />; break;
+        case "form-builder": screen = perms.canEditForm ? <FormBuilder /> : <Overview />; break;
         default:        screen = <Overview />; break;
       }
 

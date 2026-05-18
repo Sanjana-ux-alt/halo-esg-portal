@@ -55,6 +55,8 @@ const SendSurvey = () => {
   const [deadline, setDeadline] = React.useState('14 days');
   const [subject, setSubject] = React.useState(DEFAULT_EMAIL_SUBJECT);
   const [body, setBody]       = React.useState(DEFAULT_EMAIL_BODY);
+  // NEW: mandatory revenue tier (L1/L2/L3) — from Excel scoring sheet
+  const [tier, setTier]       = React.useState(null);
   const recipDropdownRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -384,6 +386,50 @@ const SendSurvey = () => {
                 ))}
               </div>
 
+              {/* Revenue tier — MANDATORY */}
+              <h3 style={{margin: "20px 0 4px", fontSize: 14, display: "flex", alignItems: "center", gap: 8}}>
+                Revenue tier
+                <span style={{color: "var(--halo-amber)", fontSize: 16, lineHeight: 1}}>*</span>
+                <span style={{fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 4, background: "var(--halo-amber-soft)", color: "#8E5F18"}}>REQUIRED</span>
+              </h3>
+              <div style={{fontSize: 12, color: "var(--halo-text-3)", marginBottom: 12, lineHeight: 1.5}}>
+                Sets which Stride ESG pass-threshold applies. Pulled from the master Excel scoring sheet (column "Pass thresholds").
+              </div>
+              <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 4}}>
+                {[
+                  { id: 'L1', label: 'L1', range: 'Revenue ≤ ₹100 Cr',           threshold: 15, c: '#6B6FBF', sub: 'Early-stage / seed'   },
+                  { id: 'L2', label: 'L2', range: '₹100 Cr – ₹200 Cr',           threshold: 30, c: '#22C28F', sub: 'Growth-stage'         },
+                  { id: 'L3', label: 'L3', range: 'Revenue > ₹200 Cr',           threshold: 40, c: '#E8A33D', sub: 'Late-stage / pre-IPO' },
+                ].map(t => {
+                  const active = tier === t.id;
+                  return (
+                    <button key={t.id} onClick={() => setTier(t.id)}
+                      style={{
+                        textAlign: "left", padding: "14px 16px", borderRadius: 10,
+                        border: active ? `2px solid ${t.c}` : "1.5px solid var(--halo-line)",
+                        background: active ? t.c + "10" : "white",
+                        cursor: "pointer", transition: "all 140ms",
+                      }}>
+                      <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6}}>
+                        <span style={{fontSize: 16, fontWeight: 800, color: active ? t.c : "var(--halo-text)", letterSpacing: "-0.01em"}}>
+                          {t.label}
+                        </span>
+                        <span style={{
+                          width: 18, height: 18, borderRadius: "50%",
+                          border: active ? `5px solid ${t.c}` : "1.5px solid var(--halo-line)",
+                          background: "white", flexShrink: 0,
+                        }} />
+                      </div>
+                      <div style={{fontSize: 12, fontWeight: 700, color: "var(--halo-text)", marginBottom: 4}}>{t.range}</div>
+                      <div style={{fontSize: 11, color: "var(--halo-text-3)", marginBottom: 6}}>{t.sub}</div>
+                      <div style={{fontSize: 10.5, letterSpacing: "0.06em", color: "var(--halo-text-3)", fontFamily: "JetBrains Mono, monospace"}}>
+                        Pass ≥ <strong style={{color: active ? t.c : "var(--halo-text-2)"}}>{t.threshold}</strong>/100
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* Editable email */}
               <h3 style={{margin: "20px 0 8px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "space-between"}}>
                 <span>Email content</span>
@@ -397,9 +443,28 @@ const SendSurvey = () => {
               <label style={{fontSize: 11, color: "var(--halo-text-3)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600}}>Body</label>
               <textarea value={body} onChange={e => setBody(e.target.value)} style={{...inputStyleBuilder, height: "auto", padding: "12px 14px", width: "100%", marginTop: 4, minHeight: 220, fontFamily: "inherit", lineHeight: 1.55, resize: "vertical"}} />
 
+              {/* Block-reason hint */}
+              {(recipients.length === 0 || !tier) && (
+                <div style={{display: "flex", alignItems: "center", gap: 8, marginTop: 18, padding: "10px 14px", background: "var(--halo-amber-soft)", border: "1px solid #F0D5A0", borderRadius: 10, fontSize: 12, color: "#8E5F18"}}>
+                  <Icon name="flag" size={13} color="#E8A33D" />
+                  <span>
+                    {recipients.length === 0 && !tier && 'Add at least one recipient and pick a revenue tier to send.'}
+                    {recipients.length === 0 && tier && 'Add at least one recipient to send.'}
+                    {recipients.length > 0 && !tier && 'Pick a revenue tier (L1, L2, or L3) to send.'}
+                  </span>
+                </div>
+              )}
+
               <div style={{display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end"}}>
                 <button className="btn btn-ghost" onClick={() => setStep("pick")}><Icon name="arrowback" size={13} />Back</button>
-                <button className="btn btn-mint" disabled={recipients.length === 0} style={recipients.length === 0 ? {opacity:0.5, cursor:"not-allowed"} : {}} onClick={() => recipients.length && setStep("confirm")}>
+                <button className="btn btn-mint"
+                  disabled={recipients.length === 0 || !tier}
+                  style={(recipients.length === 0 || !tier) ? {opacity:0.5, cursor:"not-allowed"} : {}}
+                  onClick={() => {
+                    if (recipients.length === 0 || !tier) return;
+                    window.HALO_ESG.setCompanyTier(co.id, tier);
+                    setStep("confirm");
+                  }}>
                   Review & send to {recipients.length || 0}<Icon name="chev" size={13} />
                 </button>
               </div>
@@ -421,6 +486,14 @@ const SendSurvey = () => {
               <div style={{fontSize: 11, color: "var(--halo-text-3)", marginTop: 10, lineHeight: 1.5}}>
                 {questions.length} questions · {sections.length} sections · <strong>Stride Full Assessment</strong>
               </div>
+              {tier && (
+                <div style={{marginTop: 12, padding: "10px 12px", background: "#F2FBF7", border: "1px solid #B8EDD8", borderRadius: 8, display: "flex", alignItems: "center", gap: 8}}>
+                  <Icon name="shield" size={13} color="#22C28F" />
+                  <div style={{fontSize: 11.5, color: "var(--halo-text-2)", lineHeight: 1.4}}>
+                    Tier <strong style={{color: "#1B7C5E"}}>{tier}</strong> · pass threshold <span className="mono" style={{fontWeight: 700}}>{window.HALO_ESG.SCORING.PASS_THRESHOLDS[tier]}</span>/100
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -433,11 +506,19 @@ const SendSurvey = () => {
             <Icon name="check" size={36} stroke={2.5} />
           </div>
           <h2 style={{margin: 0, fontSize: 22, fontWeight: 700}}>Survey sent to {co.name}</h2>
-          <p style={{color: "var(--halo-text-2)", fontSize: 14, maxWidth: 480, margin: "10px auto 22px"}}>
+          <p style={{color: "var(--halo-text-2)", fontSize: 14, maxWidth: 480, margin: "10px auto 18px"}}>
             We've emailed {co.spoc} a secure link with {questions.length} questions. You'll be notified as sections are completed.
           </p>
+          {tier && (
+            <div style={{display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", background: "#F2FBF7", border: "1px solid #B8EDD8", borderRadius: 999, marginBottom: 22}}>
+              <Icon name="shield" size={13} color="#22C28F" />
+              <span style={{fontSize: 12, fontWeight: 700, color: "#1B7C5E"}}>
+                Tagged as Tier {tier} · pass threshold {window.HALO_ESG.SCORING.PASS_THRESHOLDS[tier]}/100
+              </span>
+            </div>
+          )}
           <div style={{display: "flex", gap: 10, justifyContent: "center"}}>
-            <button className="btn btn-outline" onClick={() => { setStep("pick"); setSelected(null); setQuestions(TEMPLATE_QUESTIONS); }}>Send to another</button>
+            <button className="btn btn-outline" onClick={() => { setStep("pick"); setSelected(null); setTier(null); setQuestions(TEMPLATE_QUESTIONS); }}>Send to another</button>
             <button className="btn btn-mint" onClick={() => window.HALO_NAV("overview")}>Back to assessments</button>
           </div>
         </div>

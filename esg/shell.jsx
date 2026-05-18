@@ -50,6 +50,11 @@ const Sidebar = ({ active, role, userName }) => {
         <Icon name="send" />Send Survey
       </a>
     )}
+    {perms.canEditForm && (
+      <a className="nav-item" href="#" onClick={(e)=>{e.preventDefault();window.HALO_NAV("form-builder");}}>
+        <Icon name="pen" />Form Builder
+      </a>
+    )}
 
     <div className="nav-group">Account</div>
     <a className="nav-item" href="#"><Icon name="shield" />Settings</a>

@@ -108,7 +108,7 @@ const buildSubmittedAnswers = (co) => {
   const SCORING = window.HALO_ESG.SCORING;
   const sec = SCORING.sectorKey(co.sector);
   const ans = window.HALO_ESG.STATE.answers[co.id] || {};
-  const allQs = SCORING.QUESTIONS.filter(q => !q.sectors || q.sectors.includes(sec));
+  const allQs = SCORING.getActiveQuestions().filter(q => !q.sectors || q.sectors.includes(sec));
   const order = []; const map = {};
   allQs.forEach(q => {
     if (!map[q.section]) { map[q.section] = []; order.push(q.section); }
