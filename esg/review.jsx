@@ -60,8 +60,32 @@ const Review = ({ companyId, embedded }) => {
     pct_women_lead: [{ author: "Krishti Sharma", time: "2 days ago", text: "Pay gap is acceptable now but trending wider — please share latest 12-month comp benchmarking.", sentToFounder: false }],
     scope12:        [{ author: "Krishti Sharma", time: "Yesterday",  text: "We need Scope 3 disclosure or a written rationale for omission.", sentToFounder: true }],
   });
+  const REVIEWER = "Krishti Sharma";
+  const nowStr = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  // ── Flag actions ──
   const [userFlags, setUserFlags] = React.useState({});
-  const toggleFlag = (qid, currentFlag) => setUserFlags(prev => ({...prev, [qid]: !currentFlag}));
+  const [flagReviews, setFlagReviews] = React.useState({});
+  const [flagModal, setFlagModal] = React.useState(null); // { qid, question, currentFlag }
+  const [flagComment, setFlagComment] = React.useState("");
+  const [toast, setToast] = React.useState(null);
+  const openFlagModal = (qid, question, currentFlag) => { setFlagModal({ qid, question, currentFlag }); setFlagComment(""); };
+  const confirmFlagAction = () => {
+    const { qid, currentFlag } = flagModal;
+    setUserFlags(prev => ({...prev, [qid]: !currentFlag}));
+    setFlagReviews(prev => ({...prev, [qid]: {
+      by: REVIEWER, time: nowStr(),
+      comment: flagComment.trim(),
+      action: currentFlag ? 'approved' : 'flagged',
+    }}));
+    setFlagModal(null);
+    setFlagComment("");
+    const msg = currentFlag
+      ? "Flag approved — notification sent to ESG team"
+      : "Flag raised — notification sent to ESG team";
+    setToast(msg);
+    setTimeout(() => setToast(null), 3800);
+  };
 
   // ── Approval workflow ──
   const APPROVAL_STEPS = [
@@ -71,8 +95,6 @@ const Review = ({ companyId, embedded }) => {
     { id: 'qa',        label: 'Q&A Closed',           desc: 'All open founder questions have been answered.' },
     { id: 'signoff',   label: 'Final Sign-off',       desc: 'ESG lead formally approves this assessment for the IC.' },
   ];
-  const REVIEWER = "Krishti Sharma";
-  const nowStr = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const [showApproval, setShowApproval] = React.useState(false);
   const [showApprovalRecord, setShowApprovalRecord] = React.useState(false);
   const [checkedSteps, setCheckedSteps] = React.useState({});
@@ -448,6 +470,129 @@ const Review = ({ companyId, embedded }) => {
         </div>
       )}
 
+      {/* ── Flag confirmation modal ── */}
+      {flagModal && (
+        <div style={{
+          position:"fixed",inset:0,background:"rgba(11,26,63,0.5)",zIndex:110,
+          display:"flex",alignItems:"center",justifyContent:"center",
+        }} onClick={() => setFlagModal(null)}>
+          <div style={{
+            background:"white",borderRadius:16,padding:"28px 32px",width:460,maxWidth:"92vw",
+            boxShadow:"0 24px 64px rgba(11,26,63,0.22)",
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:18}}>
+              <div>
+                <div style={{
+                  display:"inline-flex",alignItems:"center",gap:6,marginBottom:10,
+                  padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",
+                  background: flagModal.currentFlag ? "#F2FBF7" : "#FFF7EC",
+                  color: flagModal.currentFlag ? "#1B7C5E" : "#8E5F18",
+                  border: "1px solid " + (flagModal.currentFlag ? "#B8EDD8" : "#F0D5A0"),
+                }}>
+                  <Icon name="flag" size={10} color={flagModal.currentFlag ? "#22C28F" : "#E8A33D"} />
+                  {flagModal.currentFlag ? "Approve Flag" : "Raise Flag"}
+                </div>
+                <div style={{fontSize:18,fontWeight:800,color:"var(--halo-navy)",lineHeight:1.25}}>
+                  {flagModal.currentFlag ? "Mark this concern as resolved?" : "Flag this response?"}
+                </div>
+              </div>
+              <button onClick={() => setFlagModal(null)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--halo-text-3)",padding:2}}>
+                <Icon name="x" size={17} />
+              </button>
+            </div>
+
+            {/* Question preview */}
+            <div style={{
+              background:"#F7F8FC",borderRadius:8,padding:"10px 14px",
+              fontSize:12.5,color:"var(--halo-text-2)",lineHeight:1.5,
+              borderLeft:"3px solid " + (flagModal.currentFlag ? "var(--halo-mint)" : "var(--halo-amber)"),
+              marginBottom:18,
+            }}>
+              {flagModal.question}
+            </div>
+
+            {/* Comment */}
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:12,fontWeight:700,color:"var(--halo-text)",marginBottom:6}}>
+                {flagModal.currentFlag ? "Reason for approval" : "Reason for flagging"}
+                {flagModal.currentFlag
+                  ? <span style={{fontWeight:400,color:"var(--halo-text-3)",marginLeft:4}}>(required)</span>
+                  : <span style={{fontWeight:400,color:"var(--halo-text-3)",marginLeft:4}}>(optional)</span>
+                }
+              </div>
+              <textarea
+                value={flagComment}
+                onChange={e => setFlagComment(e.target.value)}
+                autoFocus
+                placeholder={flagModal.currentFlag
+                  ? "Explain why this concern has been addressed…"
+                  : "Describe the concern or issue with this response…"
+                }
+                rows={3}
+                style={{
+                  width:"100%",boxSizing:"border-box",resize:"vertical",
+                  border:"1.5px solid #E6E7F4",borderRadius:8,
+                  padding:"9px 12px",fontSize:13,lineHeight:1.55,
+                  color:"var(--halo-text)",fontFamily:"Figtree, sans-serif",outline:"none",
+                }}
+                onFocus={e => e.target.style.borderColor = flagModal.currentFlag ? "#22C28F" : "#E8A33D"}
+                onBlur={e => e.target.style.borderColor="#E6E7F4"}
+              />
+            </div>
+
+            {/* Email notice */}
+            <div style={{
+              display:"flex",alignItems:"center",gap:7,
+              background:"#F7F8FC",borderRadius:8,padding:"9px 12px",
+              fontSize:11.5,color:"var(--halo-text-3)",marginBottom:20,
+            }}>
+              <Icon name="mail" size={13} color="#8B91AB" />
+              A notification with your comment will be sent to the ESG team via email.
+            </div>
+
+            {/* Actions */}
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setFlagModal(null)}>Cancel</button>
+              <button
+                onClick={confirmFlagAction}
+                disabled={flagModal.currentFlag && !flagComment.trim()}
+                style={{
+                  background: flagModal.currentFlag
+                    ? (flagComment.trim() ? "var(--halo-mint)" : "#E6E7F4")
+                    : "#E8A33D",
+                  color: flagModal.currentFlag
+                    ? (flagComment.trim() ? "white" : "#8B91AB")
+                    : "white",
+                  border:"none",borderRadius:8,padding:"8px 20px",
+                  fontSize:13,fontWeight:700,cursor: (flagModal.currentFlag && !flagComment.trim()) ? "not-allowed" : "pointer",
+                  display:"inline-flex",alignItems:"center",gap:6,
+                }}>
+                <Icon name="check" size={13} color={flagModal.currentFlag ? (flagComment.trim() ? "white" : "#8B91AB") : "white"} />
+                {flagModal.currentFlag ? "Approve & Notify" : "Raise Flag & Notify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Email sent toast ── */}
+      {toast && (
+        <div style={{
+          position:"fixed",bottom:28,right:28,zIndex:200,
+          display:"flex",alignItems:"center",gap:10,
+          background:"var(--halo-navy)",color:"white",
+          padding:"12px 18px",borderRadius:10,
+          fontSize:13,fontWeight:600,
+          boxShadow:"0 8px 32px rgba(11,26,63,0.3)",
+          animation:"fadeInUp 220ms ease",
+        }}>
+          <Icon name="send" size={14} color="var(--halo-mint)" />
+          {toast}
+        </div>
+      )}
+
       <div className="content" style={{display: "grid", gridTemplateColumns: "1fr 320px", gap: 22, alignItems: "start"}}>
         <div>
           {/* Tab strip */}
@@ -495,6 +640,28 @@ const Review = ({ companyId, embedded }) => {
                           <Icon name="flag" size={11} /> {q.note}
                         </div>
                       )}
+                      {flagReviews[q.id] && (
+                        <div style={{
+                          marginTop: 8, display: "flex", flexDirection: "column", gap: 3,
+                        }}>
+                          <div style={{
+                            display:"inline-flex",alignItems:"center",gap:6,
+                            background: flagReviews[q.id].action==='approved' ? "#F2FBF7" : "#FFF7EC",
+                            border: "1px solid " + (flagReviews[q.id].action==='approved' ? "#B8EDD8" : "#F0D5A0"),
+                            borderRadius:6, padding:"4px 10px", width:"fit-content",
+                          }}>
+                            <Icon name="check" size={10} color={flagReviews[q.id].action==='approved' ? "#22C28F" : "#E8A33D"} stroke={2.5} />
+                            <span style={{fontSize:11,fontWeight:600,color:flagReviews[q.id].action==='approved' ? "#1B7C5E" : "#8E5F18"}}>
+                              {flagReviews[q.id].action==='approved' ? "Approved" : "In Review"} by <strong>{flagReviews[q.id].by}</strong> · {flagReviews[q.id].time}
+                            </span>
+                          </div>
+                          {flagReviews[q.id].comment && (
+                            <div style={{fontSize:11.5,color:"var(--halo-text-3)",paddingLeft:2,fontStyle:"italic"}}>
+                              "{flagReviews[q.id].comment}"
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div style={{minWidth: 180, textAlign: "right"}}>
                       <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "flex-end"}}>
@@ -508,7 +675,7 @@ const Review = ({ companyId, embedded }) => {
                       <div style={{display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 10, flexWrap: "wrap"}}>
                         <button
                           className={"btn btn-sm " + (q.flag ? "btn-outline" : "btn-ghost")}
-                          onClick={() => toggleFlag(q.id, q.flag)}
+                          onClick={() => openFlagModal(q.id, q.q, q.flag)}
                           style={q.flag ? {borderColor:"var(--halo-amber)",color:"#8E5F18"} : {}}>
                           <Icon name="flag" size={11} />{q.flag ? "Flagged" : "Flag"}
                         </button>

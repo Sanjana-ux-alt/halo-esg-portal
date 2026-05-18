@@ -366,6 +366,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
 /* ---- misc ---- */
 .fade-in { animation: fadein 220ms ease-out; }
 @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .muted { color: var(--halo-text-3); }
 .divider { height: 1px; background: var(--halo-line-2); margin: 16px 0; }
 
