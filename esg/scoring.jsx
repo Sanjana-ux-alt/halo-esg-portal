@@ -41,10 +41,13 @@
     if (x.includes('health')) return 'Healthtech';
     return 'Consumer';
   };
+  // Tier breakpoints come from the Excel SOP sheet ("Read me (SOP)" in
+  // SV_ESG KPI Scoring Sheet_HALO.xlsx): L1 = revenue <₹100 Cr, L2 = ₹100-500 Cr,
+  // L3 = >₹500 Cr.
   const tierFromAmount = (amt) => {
     if (!amt) return 'L1';
     const n = parseInt(String(amt).replace(/[^0-9]/g, ''), 10) || 0;
-    if (n >= 200) return 'L3';
+    if (n >  500) return 'L3';
     if (n >= 100) return 'L2';
     return 'L1';
   };

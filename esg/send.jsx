@@ -425,9 +425,9 @@ const SendSurvey = () => {
               </div>
               <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 4}}>
                 {[
-                  { id: 'L1', label: 'L1', range: 'Revenue ≤ ₹100 Cr',           threshold: 15, c: '#6B6FBF', sub: 'Early-stage / seed'   },
-                  { id: 'L2', label: 'L2', range: '₹100 Cr – ₹200 Cr',           threshold: 30, c: '#22C28F', sub: 'Growth-stage'         },
-                  { id: 'L3', label: 'L3', range: 'Revenue > ₹200 Cr',           threshold: 40, c: '#E8A33D', sub: 'Late-stage / pre-IPO' },
+                  { id: 'L1', label: 'L1', range: 'Revenue < ₹100 Cr',           threshold: 15, c: '#6B6FBF', sub: 'Early-stage / seed'   },
+                  { id: 'L2', label: 'L2', range: '₹100 Cr – ₹500 Cr',           threshold: 30, c: '#22C28F', sub: 'Growth-stage'         },
+                  { id: 'L3', label: 'L3', range: 'Revenue > ₹500 Cr',           threshold: 40, c: '#E8A33D', sub: 'Late-stage / pre-IPO' },
                 ].map(t => {
                   const active = tier === t.id;
                   return (
