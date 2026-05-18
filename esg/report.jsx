@@ -215,10 +215,27 @@ const FormulaTip = ({ kind, color, sec, scores, tier, threshold, computed, ancho
                   );
                 })}
 
-                {/* Pillar grand total */}
-                <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:11.5,padding:"10px 12px",marginTop:10,background:"rgba(255,255,255,0.06)",borderRadius:7,color:"#C5C9DD",lineHeight:1.6}}>
-                  {rows.map(t => r2(t.scored)).join(' + ')} = <span style={{color:"white",fontWeight:700}}>{r2(totalScored)}</span> / {r2(totalMax)} pts
-                </div>
+                {/* Pillar grand total — show both the live computed Σ and (if it diverges)
+                    the Excel-reported value so the tile and tooltip stay reconciled */}
+                {(() => {
+                  const excelPillar = scores ? (kind === 'E' ? scores.e : kind === 'S' ? scores.s : scores.g) : null;
+                  const hasExcel = excelPillar !== null && excelPillar !== undefined;
+                  const computedSum = r2(totalScored);
+                  const gap = hasExcel ? Math.abs(excelPillar - computedSum) : 0;
+                  return (
+                    <>
+                      <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:11.5,padding:"10px 12px",marginTop:10,background:"rgba(255,255,255,0.06)",borderRadius:7,color:"#C5C9DD",lineHeight:1.6}}>
+                        {rows.map(t => r2(t.scored)).join(' + ')} = <span style={{color:"white",fontWeight:700}}>{computedSum}</span> / {r2(totalMax)} pts
+                      </div>
+                      {hasExcel && gap > 0.2 && (
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,padding:"7px 2px 0",color:"#ADB3CE",lineHeight:1.5}}>
+                          <span>Excel-reported {kind === 'E' ? 'Environment' : kind === 'S' ? 'Social' : 'Governance'} total:</span>
+                          <span style={{color:color,fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{excelPillar} / {r2(totalMax)}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             );
           })()}

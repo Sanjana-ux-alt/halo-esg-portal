@@ -455,13 +455,162 @@
   ];
 
   // ============================================================
+  // 3b. ANSWER NORMALIZATION
+  // The real Excel survey lets founders type free-text answers and choose from
+  // long, conversational options that don't always letter-match the scoring.jsx
+  // option labels (e.g. Excel says "We do not have hazardous waste" but the
+  // scoring rule label is "N/A — no hazardous waste produced"). Without this
+  // mapping, the per-question breakdown silently scores 0 and the pillar total
+  // in the formula tooltip won't add up to the Excel pillar total displayed in
+  // the hero tile. Each regex covers a real Excel response pattern.
+  // ============================================================
+  const labelOf = (o) => typeof o === 'object' ? o.l : o;
+  const findOpt = (q, re) => {
+    if (!Array.isArray(q.opts)) return null;
+    return q.opts.find(o => re.test(labelOf(o)));
+  };
+  const STOPWORDS = new Set([
+    'the','and','for','with','our','any','have','has','not','yet','but','this','that','its','from',
+    'are','will','can','use','off','out','all','via','you','we','to','of','in','on','an','as','is','it',
+    'do','does','etc','some','most','plan','do','currently'
+  ]);
+  const sigTokens = (s) => {
+    const toks = String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().split(/\s+/);
+    return new Set(toks.filter(t => t.length >= 3 && !STOPWORDS.has(t)));
+  };
+
+  const normalizeAnswerForOption = (answer, q) => {
+    if (typeof answer !== 'string' || !Array.isArray(q.opts)) return answer;
+    const a = answer.trim();
+    if (!a) return a;
+    // Exact match already? Skip normalize.
+    if (q.opts.some(o => labelOf(o) === a)) return a;
+
+    // ── Pattern-based normalization for common Excel wording ──
+    // "plan to" answers
+    if (/(not yet (implemented|tracked|calculate)|have not yet|plan to (start|introduce|do so|calculate))/i.test(a)) {
+      const m = findOpt(q, /(plan|not yet)/i);
+      if (m) return labelOf(m);
+    }
+    // "We do not have this data yet, but we plan to calculate"
+    if (/no data yet|do not have this data.*plan to calculate|plan to calculate this year/i.test(a)) {
+      const m = findOpt(q, /no data yet|plan to calculate/i);
+      if (m) return labelOf(m);
+    }
+    // Hazardous N/A — Excel says "We do not have hazardous waste"
+    if (/^we do not have hazardous/i.test(a)) {
+      const m = findOpt(q, /n\/?a.*no hazardous|no hazardous waste produced/i);
+      if (m) return labelOf(m);
+    }
+    if (/^we do not have non-?hazardous/i.test(a)) {
+      const m = findOpt(q, /n\/?a.*no non-?hazardous|no non-?hazardous waste produced/i);
+      if (m) return labelOf(m);
+    }
+    // Waste disposal options
+    if (/reuse.*recycle.*treat onsite|onsite.*reuse/i.test(a)) {
+      const m = findOpt(q, /reuse.*recycle.*onsite/i);
+      if (m) return labelOf(m);
+    }
+    if (/sell it to (another )?industry.*recycler|sell.*recycler directly/i.test(a)) {
+      const m = findOpt(q, /sell.*industry.*recycler/i);
+      if (m) return labelOf(m);
+    }
+    if (/local municipality.*municipal waste|local municipality.*waste stream/i.test(a)) {
+      const m = findOpt(q, /local municipality.*waste/i);
+      if (m) return labelOf(m);
+    }
+    if (/incineration|landfill/i.test(a)) {
+      const m = findOpt(q, /incineration.*landfill/i);
+      if (m) return labelOf(m);
+    }
+    // Scope 3 tracking
+    if (q.id === 'scope3' && /^no.*not track.*scope 3|^no we do not track/i.test(a)) {
+      const m = findOpt(q, /^no.*not track scope 3/i);
+      if (m) return labelOf(m);
+    }
+    if (q.id === 'scope3' && /globally established methodolog|yes.*based on/i.test(a)) {
+      const m = findOpt(q, /^yes.*globally/i);
+      if (m) return labelOf(m);
+    }
+    if (q.id === 'scope3' && /track some scope 3|partial/i.test(a)) {
+      const m = findOpt(q, /track some|partial/i);
+      if (m) return labelOf(m);
+    }
+    // Safety drills frequency — Excel has a typo "monhs"
+    if (/once every 2-6 monh?ths?/i.test(a)) {
+      const m = findOpt(q, /once every 2-6 months/i);
+      if (m) return labelOf(m);
+    }
+    // Training hours — Excel has double-space "10 - 20 hours  per employee"
+    if (q.id === 'training_hrs') {
+      const collapsed = a.replace(/\s+/g, ' ');
+      const m = q.opts.find(o => labelOf(o).replace(/\s+/g,' ') === collapsed);
+      if (m) return labelOf(m);
+    }
+    // Energy source — long Excel wording
+    if (q.id === 'energy_src') {
+      if (/mix.*grid.*captive.*non.?renewable/i.test(a)) {
+        const m = findOpt(q, /mix.*grid.*captive.*non.?renewable/i);
+        if (m) return labelOf(m);
+      }
+      if (/mix.*grid.*captive.*renewable/i.test(a)) {
+        const m = findOpt(q, /mix.*grid.*captive.*renewable/i);
+        if (m) return labelOf(m);
+      }
+      if (/only captive.*non.?renewable/i.test(a)) {
+        const m = findOpt(q, /only captive.*non.?renewable/i);
+        if (m) return labelOf(m);
+      }
+      if (/only captive.*renewable/i.test(a)) {
+        const m = findOpt(q, /only captive.*renewable/i);
+        if (m) return labelOf(m);
+      }
+    }
+    // GHG emissions amount strings (e.g. "500 - 1000 tCO2", "1000 - 5000 tCO2")
+    if (/<\s?500\s*tco2/i.test(a)) {
+      const m = findOpt(q, /<500 tco2/i);
+      if (m) return labelOf(m);
+    }
+    if (/>\s?10[,\s]?000\s*tco2/i.test(a)) {
+      const m = findOpt(q, />10,?000 tco2/i);
+      if (m) return labelOf(m);
+    }
+    // Consumer responsibility — "Some of the standards"
+    if (q.id === 'cr_compliance' && /some of the standards/i.test(a)) {
+      const m = findOpt(q, /some of the standards/i);
+      if (m) return labelOf(m);
+    }
+
+    // ── Fuzzy fallback: pick the option with the most significant-token overlap ──
+    const aSig = sigTokens(a);
+    if (aSig.size === 0) return a;
+    let best = null, bestRatio = 0;
+    for (const o of q.opts) {
+      const ol = labelOf(o);
+      const oSig = sigTokens(ol);
+      if (oSig.size === 0) continue;
+      const inter = [...aSig].filter(t => oSig.has(t)).length;
+      const union = new Set([...aSig, ...oSig]).size;
+      if (inter < 2) continue;  // need at least 2 distinctive tokens in common
+      const ratio = inter / union;
+      if (ratio > bestRatio) { bestRatio = ratio; best = ol; }
+    }
+    return bestRatio >= 0.35 ? best : a;
+  };
+
+  // ============================================================
   // 4. SCORE A QUESTION
   // ============================================================
   const scoreQuestion = (q, answer) => {
     if (q.unscored) return null;
     if (typeof q.score === 'function') return q.score(answer);
     if (q.type === 'Single-select' && Array.isArray(q.opts) && typeof q.opts[0] === 'object') {
-      const opt = q.opts.find(o => o.l === answer);
+      // Try exact match first; fall back to the Excel-wording normalizer
+      let opt = q.opts.find(o => o.l === answer);
+      if (!opt) {
+        const norm = normalizeAnswerForOption(answer, q);
+        if (norm !== answer) opt = q.opts.find(o => o.l === norm);
+      }
       return opt ? (opt.s ?? 0) : 0;
     }
     return 0;
