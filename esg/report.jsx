@@ -80,21 +80,99 @@ const Report = ({ companyId, embedded }) => {
           </div>
         </div>
 
-        {/* Risk role: restricted notice + skip to sign-off */}
+        {/* ── DEAL TEAM: pipeline stage tracker only ── */}
+        {role === 'deal' && (() => {
+          const PIPELINE = [
+            { label: "Survey Sent",     done: !!(co.sent && co.sent !== "—"),                          date: co.sent },
+            { label: "Form Filling",    done: co.progress > 0,   partial: co.progress > 0 && co.progress < 100, date: co.progress > 0 ? `${co.progress}% complete` : null },
+            { label: "Form Submitted",  done: !!(co.submitted && co.submitted !== "—"),                date: co.submitted },
+            { label: "Score Generated", done: co.score !== null,                                       date: co.score !== null ? `ESG Score: ${co.score}` : null },
+            { label: "ESG Approved",    done: co.status === "completed" && co.reviewed !== "—",        date: co.reviewed !== "—" ? co.reviewed : null },
+          ];
+          const currentIdx = PIPELINE.reduce((acc, s, i) => s.done ? i : acc, -1);
+          return (
+            <div className="card card-pad" style={{marginTop: 18, marginBottom: 40}}>
+              <div style={{fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 20}}>
+                Assessment Progress
+              </div>
+              <div style={{display: "flex", alignItems: "flex-start", gap: 0}}>
+                {PIPELINE.map((stage, i) => {
+                  const isDone    = stage.done && !stage.partial;
+                  const isPartial = stage.partial;
+                  const isCurrent = i === currentIdx + 1 && !isDone;
+                  const circleColor = isDone ? "var(--halo-mint)" : isPartial ? "#E8A33D" : isCurrent ? "#6B6FBF" : "#ECEEF6";
+                  const textColor   = isDone ? "#1B7C5E" : isPartial ? "#8E5F18" : isCurrent ? "#45489B" : "var(--halo-text-3)";
+                  const lineColor   = isDone ? "var(--halo-mint)" : "#ECEEF6";
+                  return (
+                    <div key={i} style={{flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative"}}>
+                      {/* Connector line */}
+                      {i < PIPELINE.length - 1 && (
+                        <div style={{
+                          position: "absolute", top: 16, left: "50%", width: "100%",
+                          height: 2, background: lineColor, zIndex: 0,
+                        }} />
+                      )}
+                      {/* Circle */}
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%",
+                        background: circleColor, border: "2px solid " + (isDone ? "var(--halo-mint)" : isPartial ? "#E8A33D" : isCurrent ? "#6B6FBF" : "#DDDFE8"),
+                        display: "grid", placeItems: "center", zIndex: 1,
+                        boxShadow: isDone ? "0 0 0 4px rgba(34,194,143,0.15)" : isCurrent ? "0 0 0 4px rgba(107,111,191,0.15)" : "none",
+                      }}>
+                        {isDone
+                          ? <Icon name="check" size={14} color="white" stroke={2.5} />
+                          : isPartial
+                          ? <Icon name="clock" size={13} color="white" stroke={2} />
+                          : <span style={{fontSize: 11, fontWeight: 700, color: isCurrent ? "#45489B" : "#A0A4B8"}}>{i + 1}</span>
+                        }
+                      </div>
+                      {/* Label + date */}
+                      <div style={{marginTop: 10, textAlign: "center", paddingLeft: 4, paddingRight: 4}}>
+                        <div style={{fontSize: 11.5, fontWeight: isDone || isCurrent ? 700 : 500, color: textColor, lineHeight: 1.3}}>
+                          {stage.label}
+                        </div>
+                        {stage.date && stage.date !== "—" && (
+                          <div style={{fontSize: 10, color: "var(--halo-text-3)", marginTop: 3}}>{stage.date}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Send survey CTA */}
+              <div style={{marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--halo-line-2)", display: "flex", alignItems: "center", justifyContent: "space-between"}}>
+                <div>
+                  <div style={{fontSize: 13, fontWeight: 600}}>Need to send or resend the survey?</div>
+                  <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 2}}>The ESG team will be notified once the form is submitted.</div>
+                </div>
+                <button className="btn btn-mint btn-sm" onClick={() => window.HALO_NAV("send")}>
+                  <Icon name="send" size={12} />Send Survey
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── RISK TEAM: access notice only ── */}
         {role === 'risk' && (
-          <div className="card card-pad" style={{marginBottom: 18, borderLeft: "3px solid var(--halo-amber)", background: "#FFFBF2"}}>
-            <div style={{display: "flex", alignItems: "center", gap: 10}}>
-              <Icon name="lock" size={16} color="#E8A33D" />
+          <div className="card card-pad" style={{marginTop: 18, marginBottom: 40, borderLeft: "3px solid var(--halo-amber)", background: "#FFFBF2"}}>
+            <div style={{display: "flex", alignItems: "center", gap: 12}}>
+              <div style={{width: 36, height: 36, borderRadius: "50%", background: "#FBF1DE", display: "grid", placeItems: "center", flexShrink: 0}}>
+                <Icon name="shield" size={16} color="#E8A33D" />
+              </div>
               <div>
-                <div style={{fontSize: 13, fontWeight: 700, color: "#A66E10"}}>Detailed breakdown available to ESG and Deal teams only.</div>
-                <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 3}}>You are viewing a risk-role summary. Pillar scores, improvements, benchmarking, and recommendations are restricted.</div>
+                <div style={{fontSize: 13, fontWeight: 700, color: "#8E5F18"}}>Score summary — Risk Team view</div>
+                <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 3, lineHeight: 1.5}}>
+                  Pillar breakdown, improvements, benchmarking and recommendations are visible to ESG and Deal teams only. Contact the ESG team for the full assessment.
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Pillar tiles — hidden for risk */}
-        {role !== 'risk' && (
+        {/* ── ESG TEAM: full report ── */}
+        {role === 'esg' && (<>
+          {/* Pillar tiles */}
           <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, margin: "22px 0"}}>
             {[
               { p: "Environment", v: 26.2, m: 35, c: "#22C28F", note: "Strong renewable mix; Scope 3 disclosure pending" },
@@ -111,20 +189,13 @@ const Report = ({ companyId, embedded }) => {
               </div>
             ))}
           </div>
-        )}
 
-        {/* Assessment Summary & Priority Improvements — hidden for risk */}
-        {role !== 'risk' && (
+          {/* Assessment Summary & Priority Improvements */}
           <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16}}>
-            {/* Change 1: Assessment Summary */}
             <div className="card card-pad" style={{borderLeft: "3px solid var(--halo-mint)"}}>
               <div style={{fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 10}}>Assessment Summary</div>
-              <p style={{margin: 0, fontSize: 13, color: "var(--halo-text-2)", lineHeight: 1.7}}>
-                {assessmentSummary}
-              </p>
+              <p style={{margin: 0, fontSize: 13, color: "var(--halo-text-2)", lineHeight: 1.7}}>{assessmentSummary}</p>
             </div>
-
-            {/* Change 2: Priority improvements with threshold label */}
             <div className="card card-pad" style={{borderLeft: "3px solid var(--halo-amber)"}}>
               <div style={{display: "flex", alignItems: "center", gap: 10, marginBottom: 12}}>
                 <h3 style={{margin: 0, fontSize: 15}}>Priority improvements</h3>
@@ -140,10 +211,8 @@ const Report = ({ companyId, embedded }) => {
               ))}
             </div>
           </div>
-        )}
 
-        {/* Peer benchmarking — hidden for risk */}
-        {role !== 'risk' && (
+          {/* Peer benchmarking */}
           <div className="card" style={{marginTop: 22}}>
             <div className="card-h">
               <div>
@@ -154,13 +223,8 @@ const Report = ({ companyId, embedded }) => {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{paddingLeft: 24}}>Company</th>
-                  <th>Stage</th>
-                  <th>E</th>
-                  <th>S</th>
-                  <th>G</th>
-                  <th>Total</th>
-                  <th>Δ vs avg</th>
+                  <th style={{paddingLeft: 24}}>Company</th><th>Stage</th>
+                  <th>E</th><th>S</th><th>G</th><th>Total</th><th>Δ vs avg</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,20 +239,16 @@ const Report = ({ companyId, embedded }) => {
                   <tr key={i} style={r.this ? {background: "#F2FBF7"} : {}}>
                     <td style={{paddingLeft: 24, fontWeight: r.this ? 700 : 500}}>{r.n}{r.this && <span style={{marginLeft: 8, fontSize: 10, color: "#1B7C5E", fontWeight: 700}}>● THIS COMPANY</span>}</td>
                     <td className="muted">{r.s}</td>
-                    <td className="mono">{r.e}</td>
-                    <td className="mono">{r.so}</td>
-                    <td className="mono">{r.g}</td>
-                    <td className="mono" style={{fontWeight: 700}}>{r.t}</td>
+                    <td className="mono">{r.e}</td><td className="mono">{r.so}</td>
+                    <td className="mono">{r.g}</td><td className="mono" style={{fontWeight: 700}}>{r.t}</td>
                     <td className="mono" style={{color: r.d.startsWith("+") ? "#1B7C5E" : r.d.startsWith("−") ? "#9F2D2D" : "var(--halo-text-3)", fontWeight: 600}}>{r.d}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
 
-        {/* Recommendations — hidden for risk */}
-        {role !== 'risk' && (
+          {/* Recommendations */}
           <div className="card" style={{marginTop: 22}}>
             <div className="card-h">
               <div>
@@ -198,9 +258,9 @@ const Report = ({ companyId, embedded }) => {
             </div>
             <div style={{padding: "0 24px 22px"}}>
               {[
-                { p: "High", c: "#E25C5C", bg: "#FBE3E3", t: "Publish Scope 3 emissions inventory", b: "Engage a third-party verifier (CDP, Greenly) to baseline Scope 3 across borrowers and operations.", impact: "+3.2 pts", time: "Q3 FY26" },
-                { p: "Medium", c: "#E8A33D", bg: "#FBF1DE", t: "Close gender pay gap to under 2%", b: "Roll out structured pay bands and run a remediation review at the next merit cycle.", impact: "+2.4 pts", time: "Q4 FY26" },
-                { p: "Medium", c: "#6B6FBF", bg: "#E6E7F4", t: "Expand supplier ESG audit coverage", b: "Onboard top 50 suppliers (currently 18) to a self-assessment + spot-check program.", impact: "+1.8 pts", time: "FY27 H1" },
+                { p: "High",   c: "#E25C5C", bg: "#FBE3E3", t: "Publish Scope 3 emissions inventory",    b: "Engage a third-party verifier (CDP, Greenly) to baseline Scope 3 across borrowers and operations.", impact: "+3.2 pts", time: "Q3 FY26" },
+                { p: "Medium", c: "#E8A33D", bg: "#FBF1DE", t: "Close gender pay gap to under 2%",        b: "Roll out structured pay bands and run a remediation review at the next merit cycle.",                impact: "+2.4 pts", time: "Q4 FY26" },
+                { p: "Medium", c: "#6B6FBF", bg: "#E6E7F4", t: "Expand supplier ESG audit coverage",      b: "Onboard top 50 suppliers (currently 18) to a self-assessment + spot-check program.",                 impact: "+1.8 pts", time: "FY27 H1" },
               ].map((r,i) => (
                 <div key={i} style={{display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 18, alignItems: "flex-start", padding: "14px 0", borderTop: i ? "1px solid var(--halo-line-2)" : "none"}}>
                   <span style={{padding: "3px 9px", borderRadius: 999, background: r.bg, color: r.c, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em"}}>{r.p}</span>
@@ -216,30 +276,30 @@ const Report = ({ companyId, embedded }) => {
               ))}
             </div>
           </div>
-        )}
 
-        {/* Sign-off — always visible */}
-        <div className="card card-pad" style={{marginTop: 22, marginBottom: 40}}>
-          <h3 style={{margin: "0 0 16px", fontSize: 15}}>Approval & sign-off</h3>
-          <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18}}>
-            {[
-              { r: "Reviewed by", n: "Krishti Sharma", role: "Head of ESG", d: "Apr 29, 2026", s: "completed" },
-              { r: "Approved by", n: "Akshat Gautam",  role: "Deal Partner", d: "May 2, 2026", s: "completed" },
-              { r: "Acknowledged", n: "Vikram Jain",   role: "Founder, WeRize", d: "Pending", s: "in-progress" },
-            ].map((p,i) => (
-              <div key={i} style={{padding: 16, border: "1px solid var(--halo-line)", borderRadius: 10}}>
-                <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 8}}>{p.r}</div>
-                <div style={{fontSize: 14, fontWeight: 700}}>{p.n}</div>
-                <div style={{fontSize: 12, color: "var(--halo-text-3)", marginBottom: 10}}>{p.role}</div>
-                <StatusPill status={p.s} />
-                <div style={{fontSize: 11, color: "var(--halo-text-3)", marginTop: 8}}>{p.d}</div>
-              </div>
-            ))}
+          {/* Sign-off */}
+          <div className="card card-pad" style={{marginTop: 22, marginBottom: 40}}>
+            <h3 style={{margin: "0 0 16px", fontSize: 15}}>Approval & sign-off</h3>
+            <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18}}>
+              {[
+                { r: "Reviewed by",  n: "Krishti Sharma", role: "Head of ESG",      d: "Apr 29, 2026", s: "completed"   },
+                { r: "Approved by",  n: "Akshat Gautam",  role: "Deal Partner",     d: "May 2, 2026",  s: "completed"   },
+                { r: "Acknowledged", n: "Vikram Jain",    role: "Founder, WeRize",  d: "Pending",      s: "in-progress" },
+              ].map((p,i) => (
+                <div key={i} style={{padding: 16, border: "1px solid var(--halo-line)", borderRadius: 10}}>
+                  <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 8}}>{p.r}</div>
+                  <div style={{fontSize: 14, fontWeight: 700}}>{p.n}</div>
+                  <div style={{fontSize: 12, color: "var(--halo-text-3)", marginBottom: 10}}>{p.role}</div>
+                  <StatusPill status={p.s} />
+                  <div style={{fontSize: 11, color: "var(--halo-text-3)", marginTop: 8}}>{p.d}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{marginTop: 18, padding: "12px 16px", background: "#FAFBFD", borderRadius: 8, fontSize: 11, color: "var(--halo-text-3)", lineHeight: 1.5}}>
+              Confidential — for use by Stride Ventures investment committee and the named borrower only. Report version 1.0 · Page 1 of 1.
+            </div>
           </div>
-          <div style={{marginTop: 18, padding: "12px 16px", background: "#FAFBFD", borderRadius: 8, fontSize: 11, color: "var(--halo-text-3)", lineHeight: 1.5}}>
-            Confidential — for use by Stride Ventures investment committee and the named borrower only. Report version 1.0 · Page 1 of 1.
-          </div>
-        </div>
+        </>)}
       </div>
     </div>
   );
