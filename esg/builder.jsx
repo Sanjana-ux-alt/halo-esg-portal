@@ -21,10 +21,12 @@ const FormBuilder = ({ embedded }) => {
     grouped[q.section].push(q);
   });
 
-  // View / Edit mode — page defaults to view; ESG must click Edit + confirm to make changes
+  // View / Edit mode — page defaults to view; ESG must click Edit + confirm to make changes.
+  // Only ESG (canEditForm:true) can switch to edit; deal team is permanently read-only here.
+  const canEditFormPerm = !!(window.HALO_PERMS?.canEditForm);
   const [mode, setMode] = React.useState('view'); // 'view' | 'edit'
   const [confirmEdit, setConfirmEdit] = React.useState(false);
-  const isEdit = mode === 'edit';
+  const isEdit = canEditFormPerm && mode === 'edit';
 
   // Add-question modal state
   const [adding, setAdding] = React.useState(false);
@@ -121,10 +123,14 @@ const FormBuilder = ({ embedded }) => {
                 <Icon name="check" size={13} stroke={2.5} />Done editing
               </button>
             </div>
-          ) : (
+          ) : canEditFormPerm ? (
             <button className="btn btn-mint" onClick={() => setConfirmEdit(true)}>
               <Icon name="pen" size={13} />Edit form
             </button>
+          ) : (
+            <div style={{display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 6, background: "#F4F6FA", color: "var(--halo-text-3)", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em"}}>
+              <Icon name="shield" size={11} />Edit restricted to ESG team
+            </div>
           )}
         </div>
 

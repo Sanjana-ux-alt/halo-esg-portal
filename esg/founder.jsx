@@ -15,9 +15,15 @@ const FounderView = ({ companyId }) => {
   const co = window.HALO_ESG.COMPANIES.find(c => c.id === companyId) || window.HALO_ESG.COMPANIES[0];
   const SCORING = window.HALO_ESG.SCORING;
 
-  // Role-aware edit gating: ESG can edit, deal/risk are read-only, founders (no role) can always fill
+  // Role-aware edit gating
+  // - Founder (no role): always editable (filling in the form)
+  // - ESG (canEdit perm): defaults to View; must click Edit + confirm to switch to Edit mode
+  // - Deal / Risk: always read-only
   const role = window.HALO_ROLE;
-  const canEdit = role ? !!(window.HALO_PERMS?.canEdit) : true;
+  const hasEditPerm = role ? !!(window.HALO_PERMS?.canEdit) : true;
+  const [esgEditMode, setEsgEditMode] = React.useState(false);
+  const [confirmEsgEdit, setConfirmEsgEdit] = React.useState(false);
+  const canEdit = !role ? true : (role === 'esg' ? (hasEditPerm && esgEditMode) : false);
 
   // Step 0: sector selection (always show so founder can confirm/change)
   const [sectorSelected, setSectorSelected] = React.useState(co.sector || null);
@@ -65,9 +71,13 @@ const FounderView = ({ companyId }) => {
       gap: 16, fontSize: 12,
     }}>
       <div style={{display: "flex", alignItems: "center", gap: 10, minWidth: 0}}>
-        <Icon name={role === 'esg' ? "pen" : "shield"} size={13} color={role === 'esg' ? "#22C28F" : "#8B91AB"} />
-        <span style={{color: role === 'esg' ? "#A7EBC9" : !canEdit ? "#F2C77F" : "#ADB3CE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
-          {role === 'esg' ? `ESG Team — editing ${co.name}'s responses` : !canEdit ? "Read-only view — editing not permitted for your role" : "Secure response form · auto-saved as you go"}
+        <Icon name={role === 'esg' ? (esgEditMode ? "pen" : "shield") : "shield"} size={13} color={role === 'esg' ? (esgEditMode ? "#22C28F" : "#8B91AB") : "#8B91AB"} />
+        <span style={{color: role === 'esg' ? (esgEditMode ? "#A7EBC9" : "#ADB3CE") : (role && !hasEditPerm ? "#F2C77F" : "#ADB3CE"), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
+          {role === 'esg'
+            ? `ESG Team — ${esgEditMode ? 'editing' : 'viewing'} ${co.name}'s responses`
+            : role && !hasEditPerm
+              ? "Read-only view — editing not permitted for your role"
+              : "Secure response form · auto-saved as you go"}
         </span>
       </div>
       <button onClick={() => window.HALO_NAV("company", co.id)}
@@ -194,17 +204,75 @@ const FounderView = ({ companyId }) => {
           </div>
         </div>
 
-        {/* Role banner */}
+        {/* Role banner — ESG: View by default, Edit requires confirmation */}
         {role === 'esg' && (
-          <div style={{display: "flex", alignItems: "center", gap: 10, background: "#F2FBF7", border: "1px solid #B8EDD8", borderRadius: 10, padding: "10px 16px", marginBottom: 12, fontSize: 12, color: "#1B7C5E", fontWeight: 600}}>
-            <Icon name="pen" size={13} color="#22C28F" />
-            ESG edit mode — changes save immediately to the company's record.
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            background: esgEditMode ? "#F2FBF7" : "white",
+            border: "1px solid " + (esgEditMode ? "#B8EDD8" : "var(--halo-line)"),
+            borderLeft: "3px solid " + (esgEditMode ? "#22C28F" : "#8B91AB"),
+            borderRadius: 10, padding: "12px 16px", marginBottom: 12,
+            fontSize: 12,
+          }}>
+            <Icon name={esgEditMode ? "pen" : "shield"} size={14} color={esgEditMode ? "#22C28F" : "#8B91AB"} />
+            <div style={{flex: 1}}>
+              <div style={{fontSize: 12.5, fontWeight: 700, color: esgEditMode ? "#1B7C5E" : "var(--halo-text)", display: "flex", alignItems: "center", gap: 8}}>
+                {esgEditMode ? "ESG edit mode" : "ESG view mode"}
+                <span style={{fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 4, background: esgEditMode ? "#F2FBF7" : "#F4F6FA", color: esgEditMode ? "#1B7C5E" : "var(--halo-text-3)", border: "1px solid " + (esgEditMode ? "#B8EDD8" : "var(--halo-line-2)")}}>
+                  {esgEditMode ? "LIVE EDITS" : "READ-ONLY"}
+                </span>
+              </div>
+              <div style={{fontSize: 11.5, color: "var(--halo-text-3)", marginTop: 2, lineHeight: 1.45}}>
+                {esgEditMode
+                  ? `Changes save immediately to ${co.name}'s record.`
+                  : `Browsing ${co.name}'s submitted responses. Click Edit to modify answers on the company's behalf.`}
+              </div>
+            </div>
+            {esgEditMode ? (
+              <button className="btn btn-mint btn-sm" onClick={() => setEsgEditMode(false)}>
+                <Icon name="check" size={12} stroke={2.5} />Done editing
+              </button>
+            ) : (
+              <button className="btn btn-outline btn-sm" onClick={() => setConfirmEsgEdit(true)} style={{borderColor: "#22C28F", color: "#1B7C5E"}}>
+                <Icon name="pen" size={12} />Edit form
+              </button>
+            )}
           </div>
         )}
-        {!canEdit && role && (
+        {role && role !== 'esg' && !hasEditPerm && (
           <div style={{display: "flex", alignItems: "center", gap: 10, background: "#FFF7EC", border: "1px solid #F0D5A0", borderRadius: 10, padding: "10px 16px", marginBottom: 12, fontSize: 12, color: "#8E5F18", fontWeight: 600}}>
             <Icon name="shield" size={13} color="#E8A33D" />
             Read-only — your role ({role === 'deal' ? 'Deal Team' : 'Risk Team'}) can view but not edit responses.
+          </div>
+        )}
+
+        {/* ESG Edit confirmation modal */}
+        {confirmEsgEdit && (
+          <div style={{position:"fixed",inset:0,background:"rgba(11,26,63,0.55)",zIndex:120,display:"flex",alignItems:"center",justifyContent:"center"}}
+            onClick={() => setConfirmEsgEdit(false)}>
+            <div style={{background:"white",borderRadius:14,padding:"28px 32px",width:440,maxWidth:"92vw",boxShadow:"0 24px 64px rgba(11,26,63,0.22)"}}
+              onClick={e => e.stopPropagation()}>
+              <div style={{display: "flex", alignItems: "center", gap: 12, marginBottom: 14}}>
+                <div style={{width: 40, height: 40, borderRadius: 10, background: "#F2FBF7", color: "#1B7C5E", display: "grid", placeItems: "center"}}>
+                  <Icon name="pen" size={18} color="#22C28F" />
+                </div>
+                <div style={{fontSize: 18, fontWeight: 800, color: "var(--halo-navy)"}}>
+                  Switch to Edit mode?
+                </div>
+              </div>
+              <div style={{fontSize: 13, color: "var(--halo-text-2)", lineHeight: 1.6, marginBottom: 12}}>
+                You're about to edit <strong>{co.name}</strong>'s submitted ESG responses. Any change you make will overwrite the founder's answer and recompute their score immediately.
+              </div>
+              <div style={{fontSize: 12, color: "var(--halo-text-3)", lineHeight: 1.55, marginBottom: 22, paddingLeft: 14, padding: "8px 12px", background: "#FFFBF2", borderRadius: 6, borderLeft: "3px solid var(--halo-amber)"}}>
+                The audit trail records you as the editor on each modified question.
+              </div>
+              <div style={{display: "flex", gap: 10, justifyContent: "flex-end"}}>
+                <button className="btn btn-ghost" onClick={() => setConfirmEsgEdit(false)}>Cancel</button>
+                <button className="btn btn-mint" onClick={() => { setEsgEditMode(true); setConfirmEsgEdit(false); }}>
+                  <Icon name="pen" size={13} />Yes, edit responses
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
