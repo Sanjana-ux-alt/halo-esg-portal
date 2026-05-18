@@ -19,6 +19,7 @@
   <!-- Order matters: data.jsx defines globals (HALO_ESG, Icon, StatusPill, Ring) first -->
   <script type="text/babel" src="esg/data.jsx"></script>
   <script type="text/babel" src="esg/scoring.jsx"></script>
+  <script type="text/babel" src="esg/login.jsx"></script>
   <script type="text/babel" src="esg/shell.jsx"></script>
   <script type="text/babel" src="esg/overview.jsx"></script>
   <script type="text/babel" src="esg/builder.jsx"></script>
@@ -29,25 +30,55 @@
   <script type="text/babel" src="esg/report.jsx"></script>
 
   <script type="text/babel">
+    const ROLE_PERMS = {
+      esg:  { canReview: true,  canEdit: true,  canSend: true,  fullReport: true,  seeFormulas: true  },
+      deal: { canReview: false, canEdit: false,  canSend: true,  fullReport: true,  seeFormulas: false },
+      risk: { canReview: false, canEdit: false,  canSend: false, fullReport: false, seeFormulas: false },
+    };
+
     const App = () => {
-      const [route, setRoute] = React.useState({ view: "overview", id: null });
-      window.HALO_NAV = (view, id = null) => setRoute({ view, id });
+      const [role,     setRole]     = React.useState(() => localStorage.getItem('halo-esg-role') || null);
+      const [userName, setUserName] = React.useState(() => localStorage.getItem('halo-esg-user') || '');
+      const [route,    setRoute]    = React.useState({ view: "overview", id: null });
+
+      // Make role + nav available globally so any component can check them
+      window.HALO_ROLE  = role;
+      window.HALO_USER  = userName;
+      window.HALO_PERMS = role ? ROLE_PERMS[role] : {};
+      window.HALO_NAV   = (view, id = null) => setRoute({ view, id });
+      window.HALO_LOGOUT = () => {
+        localStorage.removeItem('halo-esg-role');
+        localStorage.removeItem('halo-esg-user');
+        setRole(null); setUserName('');
+      };
+
+      const handleLogin = (r, name) => {
+        localStorage.setItem('halo-esg-role', r);
+        localStorage.setItem('halo-esg-user', name);
+        window.HALO_ROLE = r; window.HALO_USER = name;
+        setRole(r); setUserName(name);
+      };
+
+      // Show login screen if not authenticated
+      if (!role) return <LoginScreen onLogin={handleLogin} />;
+
+      const perms = ROLE_PERMS[role];
 
       let screen = null;
       switch (route.view) {
         case "company": screen = <CompanyDetail companyId={route.id} />; break;
-        case "founder": screen = <FounderView companyId={route.id} />; break;
-        case "send":    screen = <SendSurvey />; break;
+        case "founder": screen = <FounderView   companyId={route.id} />; break;
+        case "send":    screen = perms.canSend ? <SendSurvey /> : <Overview />; break;
+        case "report":  screen = <Report companyId={route.id} />; break;
         default:        screen = <Overview />; break;
       }
 
-      // Founder view is the recipient-facing form — no internal sidebar.
       const showSidebar = route.view !== "founder";
       if (!showSidebar) return <div style={{minHeight: "100vh"}}>{screen}</div>;
 
       return (
         <div className="shell">
-          <Sidebar active="overview" />
+          <Sidebar active="overview" role={role} userName={userName} />
           <div className="main">{screen}</div>
         </div>
       );

@@ -1,17 +1,33 @@
 // HALO ESG — Founder-facing response form
 // Real Excel KPI questions, no scores shown to the founder.
 // Answers persist via window.HALO_ESG.STATE — review/response tabs read from there.
-// Right rail = "Ask the ESG team" thread; messages surface in the Q&A tab.
+
+const SECTOR_TILES = [
+  { label: "Consumer / D2C",      desc: "Direct-to-consumer brands, FMCG, retail" },
+  { label: "B2B SaaS",            desc: "Software, cloud platforms, enterprise tech" },
+  { label: "Fintech / Lending",   desc: "Payments, credit, insurtech, wealthtech" },
+  { label: "Agritech",            desc: "Farm inputs, supply chain, crop intelligence" },
+  { label: "Cleantech / Mobility",desc: "EVs, renewables, waste, sustainability" },
+  { label: "Healthtech",          desc: "Digital health, diagnostics, medtech" },
+];
 
 const FounderView = ({ companyId }) => {
   const co = window.HALO_ESG.COMPANIES.find(c => c.id === companyId) || window.HALO_ESG.COMPANIES[0];
   const SCORING = window.HALO_ESG.SCORING;
-  const sec = SCORING.sectorKey(co.sector);
 
-  // Visible questions for this company's sector
+  // Step 0: sector selection (always show so founder can confirm/change)
+  const [sectorSelected, setSectorSelected] = React.useState(co.sector || null);
+  const [sectorConfirmed, setSectorConfirmed] = React.useState(false);
+
+  // Once confirmed, derive the sector key from the selected sector
+  const sec = sectorConfirmed && sectorSelected
+    ? SCORING.sectorKey(sectorSelected)
+    : null;
+
+  // Visible questions for the selected sector
   const allQs = React.useMemo(
-    () => SCORING.QUESTIONS.filter(q => !q.sectors || q.sectors.includes(sec)),
-    [co.id]
+    () => sec ? SCORING.QUESTIONS.filter(q => !q.sectors || q.sectors.includes(sec)) : [],
+    [sec, co.id]
   );
   // Group by section in original order
   const grouped = React.useMemo(() => {
@@ -36,40 +52,110 @@ const FounderView = ({ companyId }) => {
 
   const setAns = (qid, val) => { window.HALO_ESG.setAnswer(co.id, qid, val); setTick(t => t + 1); };
 
-  // ── Ask ESG Team sidebar state ──
-  const [draftQ, setDraftQ] = React.useState('');
-  const thread = window.HALO_ESG.STATE.qaQuestions[co.id] || [];
-  const submitQ = () => {
-    if (!draftQ.trim()) return;
-    window.HALO_ESG.askQuestion(co.id, { from: co.spoc, q: draftQ.trim() });
-    setDraftQ('');
-    setTick(t => t + 1);
-  };
+  // ── Top bar (shared between sector step and form) ──
+  const topBar = (
+    <div style={{
+      background: "var(--halo-navy-deep)", color: "white",
+      padding: "12px 36px",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      gap: 16, fontSize: 12,
+    }}>
+      <div style={{display: "flex", alignItems: "center", gap: 10, minWidth: 0}}>
+        <Icon name="shield" size={13} color="#8B91AB" />
+        <span style={{color: "#ADB3CE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
+          Secure response form · auto-saved as you go
+        </span>
+      </div>
+      <button onClick={() => window.HALO_NAV("company", co.id)}
+        style={{
+          background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+          color: "white", cursor: "pointer", padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6,
+          display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+        }}>
+        <Icon name="arrowback" size={12} />Back to {co.name}
+      </button>
+    </div>
+  );
 
+  // ── Header card (shared) ──
+  const headerCard = (
+    <div style={{background: "white", borderRadius: 14, padding: "26px 30px", boxShadow: "var(--halo-shadow)", marginBottom: 18}}>
+      <div style={{display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 16}}>
+        <div style={{
+          width: 48, height: 48, borderRadius: 12,
+          background: "var(--halo-navy)", color: "white",
+          display: "grid", placeItems: "center",
+          fontWeight: 800, fontSize: 16, flexShrink: 0,
+        }}>S</div>
+        <div style={{flex: 1, minWidth: 0}}>
+          <div style={{fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 4}}>
+            From Stride Ventures · ESG team
+          </div>
+          <div style={{fontSize: 22, fontWeight: 700, lineHeight: 1.25, letterSpacing: "-0.01em"}}>
+            ESG Response Form for {co.name}
+          </div>
+          <div style={{fontSize: 13, color: "var(--halo-text-2)", marginTop: 6, lineHeight: 1.55}}>
+            Hi {co.spoc.split(" ")[0]}, please answer the questions below to the best of your knowledge. Your progress saves automatically — close the tab any time and return via the same link.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Sector selection screen ──
+  if (!sectorConfirmed) {
+    return (
+      <div style={{background: "#F4F6FA", minHeight: "100vh"}}>
+        {topBar}
+        <div style={{maxWidth: 860, margin: "0 auto", padding: "28px 32px 80px"}}>
+          {headerCard}
+
+          {/* Sector selection card */}
+          <div style={{background: "white", borderRadius: 14, padding: "30px 32px", boxShadow: "var(--halo-shadow)"}}>
+            <div style={{fontSize: 18, fontWeight: 700, marginBottom: 6}}>
+              Which sector best describes your business?
+            </div>
+            <div style={{fontSize: 13, color: "var(--halo-text-2)", marginBottom: 24, lineHeight: 1.55}}>
+              Select the category that most closely matches your primary business model.
+            </div>
+
+            {/* 2×3 sector tile grid */}
+            <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 22}}>
+              {SECTOR_TILES.map(tile => {
+                const active = sectorSelected === tile.label;
+                return (
+                  <SectorTile
+                    key={tile.label}
+                    tile={tile}
+                    active={active}
+                    onClick={() => setSectorSelected(tile.label)}
+                  />
+                );
+              })}
+            </div>
+
+            <div style={{fontSize: 12, color: "var(--halo-text-3)", marginBottom: 24}}>
+              Your selection determines which sector-specific questions appear in your assessment.
+            </div>
+
+            <button
+              className="btn btn-mint"
+              disabled={!sectorSelected}
+              style={!sectorSelected ? {opacity: 0.55, cursor: "not-allowed"} : {}}
+              onClick={() => setSectorConfirmed(true)}
+            >
+              Continue with {sectorSelected || "selected sector"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main form (sector confirmed) ──
   return (
     <div style={{background: "#F4F6FA", minHeight: "100vh"}}>
-      {/* Top bar */}
-      <div style={{
-        background: "var(--halo-navy-deep)", color: "white",
-        padding: "12px 36px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: 16, fontSize: 12,
-      }}>
-        <div style={{display: "flex", alignItems: "center", gap: 10, minWidth: 0}}>
-          <Icon name="shield" size={13} color="#8B91AB" />
-          <span style={{color: "#ADB3CE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
-            Secure response form · auto-saved as you go
-          </span>
-        </div>
-        <button onClick={() => window.HALO_NAV("company", co.id)}
-          style={{
-            background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-            color: "white", cursor: "pointer", padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6,
-            display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
-          }}>
-          <Icon name="arrowback" size={12} />Back to {co.name}
-        </button>
-      </div>
+      {topBar}
 
       <div style={{maxWidth: 1240, margin: "0 auto", padding: "28px 32px 80px"}}>
         {/* Header card */}
@@ -104,6 +190,22 @@ const FounderView = ({ companyId }) => {
           </div>
         </div>
 
+        {/* Sector badge + change link */}
+        <div style={{display: "flex", alignItems: "center", gap: 10, marginBottom: 18}}>
+          <span style={{
+            fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20,
+            background: "#E6F7F2", color: "#1B7C5E", border: "1px solid #A8DDD0",
+          }}>
+            Sector: {sectorSelected}
+          </span>
+          <button
+            onClick={() => setSectorConfirmed(false)}
+            style={{fontSize: 12, color: "var(--halo-text-3)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0}}
+          >
+            Change sector
+          </button>
+        </div>
+
         {/* Progress */}
         <div style={{background: "white", borderRadius: 14, padding: "16px 22px", boxShadow: "var(--halo-shadow)", marginBottom: 18}}>
           <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8}}>
@@ -115,104 +217,73 @@ const FounderView = ({ companyId }) => {
           </div>
         </div>
 
-        {/* 2-column layout: form left, Ask ESG team sticky right */}
-        <div style={{display: "grid", gridTemplateColumns: "1fr 340px", gap: 22, alignItems: "start"}}>
-          <div>
-            {grouped.map((g, gi) => (
-              <div key={g.section} style={{background: "white", borderRadius: 14, boxShadow: "var(--halo-shadow)", marginBottom: 18, overflow: "hidden"}}>
-                <div style={{padding: "18px 24px", borderBottom: "1px solid var(--halo-line-2)", display: "flex", alignItems: "center", justifyContent: "space-between"}}>
-                  <div>
-                    <div style={{fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>Section {gi + 1}</div>
-                    <div style={{fontSize: 16, fontWeight: 700, marginTop: 2}}>{g.section}</div>
-                  </div>
-                  <FounderSectionStatus items={g.items} ans={ans} />
-                </div>
+        {/* Full-width form */}
+        <div>
+          {grouped.map((g, gi) => (
+            <div key={g.section} style={{background: "white", borderRadius: 14, boxShadow: "var(--halo-shadow)", marginBottom: 18, overflow: "hidden"}}>
+              <div style={{padding: "18px 24px", borderBottom: "1px solid var(--halo-line-2)", display: "flex", alignItems: "center", justifyContent: "space-between"}}>
                 <div>
-                  {g.items.map((q, i) => (
-                    <FounderQuestion key={q.id} q={q} value={ans[q.id]} onChange={(v) => setAns(q.id, v)} index={i} />
-                  ))}
+                  <div style={{fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>Section {gi + 1}</div>
+                  <div style={{fontSize: 16, fontWeight: 700, marginTop: 2}}>{g.section}</div>
                 </div>
+                <FounderSectionStatus items={g.items} ans={ans} />
               </div>
-            ))}
-
-            {/* Footer */}
-            <div style={{background: "white", borderRadius: 14, padding: "20px 24px", boxShadow: "var(--halo-shadow)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16}}>
               <div>
-                <div style={{fontSize: 14, fontWeight: 700}}>{pct === 100 ? "Ready to submit" : "Save and continue later"}</div>
-                <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 2}}>
-                  Your progress is auto-saved. {pct < 100 ? `${allQs.length - answeredCount} questions remaining.` : 'All questions answered.'}
-                </div>
+                {g.items.map((q, i) => (
+                  <FounderQuestion key={q.id} q={q} value={ans[q.id]} onChange={(v) => setAns(q.id, v)} index={i} />
+                ))}
               </div>
-              <button className="btn btn-mint" disabled={pct < 100} style={pct < 100 ? {opacity:0.55,cursor:"not-allowed"} : {}}>
-                <Icon name="check" size={13} />Submit for review
-              </button>
             </div>
-          </div>
+          ))}
 
-          {/* Ask the ESG team — sticky right rail */}
-          <div style={{position: "sticky", top: 22, display: "flex", flexDirection: "column", gap: 14}}>
-            <div className="card card-pad">
-              <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 6}}>
-                <div style={{width: 32, height: 32, borderRadius: 8, background: "#E6E7F4", color: "#45489B", display: "grid", placeItems: "center"}}>
-                  <Icon name="help" size={15} />
-                </div>
-                <div>
-                  <div style={{fontSize: 14, fontWeight: 700}}>Ask the ESG team</div>
-                  <div style={{fontSize: 11, color: "var(--halo-text-3)"}}>Stuck on a question? They'll reply here.</div>
-                </div>
-              </div>
-              <textarea
-                value={draftQ}
-                onChange={e => setDraftQ(e.target.value)}
-                placeholder="e.g. For Scope 1+2, do we include our leased Mumbai office?"
-                style={{
-                  width: "100%", minHeight: 86, marginTop: 8,
-                  border: "1px solid var(--halo-line)", borderRadius: 9,
-                  padding: "10px 12px", fontSize: 13, fontFamily: "inherit",
-                  resize: "vertical", outline: "none", boxSizing: "border-box",
-                }}
-              />
-              <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, gap: 8}}>
-                <div style={{fontSize: 11, color: "var(--halo-text-3)"}}>Sent to Krishti Sharma</div>
-                <button className="btn btn-mint btn-sm" disabled={!draftQ.trim()} style={!draftQ.trim() ? {opacity:0.55,cursor:"not-allowed"} : {}} onClick={submitQ}>
-                  <Icon name="send" size={12} />Send question
-                </button>
+          {/* Footer */}
+          <div style={{background: "white", borderRadius: 14, padding: "20px 24px", boxShadow: "var(--halo-shadow)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16}}>
+            <div>
+              <div style={{fontSize: 14, fontWeight: 700}}>{pct === 100 ? "Ready to submit" : "Save and continue later"}</div>
+              <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 2}}>
+                Your progress is auto-saved. {pct < 100 ? `${allQs.length - answeredCount} questions remaining.` : 'All questions answered.'}
               </div>
             </div>
-
-            {/* Thread */}
-            <div className="card card-pad">
-              <div style={{fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 12}}>
-                Your conversation ({thread.length})
-              </div>
-              {thread.length === 0 && (
-                <div style={{fontSize: 12.5, color: "var(--halo-text-3)", fontStyle: "italic", padding: "4px 0 4px"}}>
-                  No questions yet. Ask anything above and the ESG team will reply.
-                </div>
-              )}
-              {thread.map((t, i) => (
-                <div key={t.id} style={{padding: "12px 0", borderTop: i ? "1px solid var(--halo-line-2)" : "none"}}>
-                  <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4}}>
-                    <span style={{fontSize: 12, fontWeight: 700}}>You</span>
-                    <span style={{fontSize: 11, color: "var(--halo-text-3)"}}>{t.time}</span>
-                  </div>
-                  <div style={{fontSize: 13, color: "var(--halo-text)", lineHeight: 1.5}}>{t.q}</div>
-                  {t.status === 'answered' ? (
-                    <div style={{marginTop: 8, padding: "10px 12px", background: "#F2FBF7", borderRadius: 8, fontSize: 12.5, color: "var(--halo-text-2)", lineHeight: 1.5}}>
-                      <strong style={{color: "var(--halo-mint)"}}>{t.repliedBy || 'ESG team'} replied:</strong> {t.a}
-                    </div>
-                  ) : (
-                    <div style={{marginTop: 6, fontSize: 11, color: "#8E5F18", fontWeight: 600, letterSpacing: "0.04em"}}>
-                      <Icon name="clock" size={11} /> Waiting for ESG team reply
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <button className="btn btn-mint" disabled={pct < 100} style={pct < 100 ? {opacity:0.55,cursor:"not-allowed"} : {}}>
+              <Icon name="check" size={13} />Submit for review
+            </button>
           </div>
         </div>
       </div>
     </div>
+  );
+};
+
+// ── Sector tile button ──
+const SectorTile = ({ tile, active, onClick }) => {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: active ? "#F2FBF7" : "white",
+        border: active
+          ? "2px solid var(--halo-mint)"
+          : hovered
+          ? "2px solid var(--halo-mint)"
+          : "2px solid var(--halo-navy)",
+        borderRadius: 12,
+        padding: "18px 20px",
+        textAlign: "left",
+        cursor: "pointer",
+        transition: "all 140ms",
+        outline: "none",
+      }}
+    >
+      <div style={{fontSize: 14, fontWeight: 700, color: "var(--halo-text)", marginBottom: 4}}>
+        {tile.label}
+      </div>
+      <div style={{fontSize: 11, color: "var(--halo-text-3)", lineHeight: 1.45}}>
+        {tile.desc}
+      </div>
+    </button>
   );
 };
 

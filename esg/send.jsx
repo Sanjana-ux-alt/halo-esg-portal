@@ -44,7 +44,7 @@ const SendSurvey = () => {
   const [selected, setSelected] = React.useState(null);
   const [template, setTemplate] = React.useState("full");
   const [questions, setQuestions] = React.useState(TEMPLATE_QUESTIONS);
-  const [step, setStep] = React.useState("pick"); // pick → template → builder → configure → confirm
+  const [step, setStep] = React.useState("pick"); // pick → configure → confirm (template/builder removed)
   const [adding, setAdding] = React.useState(false);
   const [draft, setDraft] = React.useState({ section: "Workforce & Diversity", q: "", type: "Number", required: true });
 
@@ -75,8 +75,8 @@ const SendSurvey = () => {
   };
   const removeQ = id => setQuestions(questions.filter(q => q.id !== id));
 
-  const STEPS = ["Pick company", "Choose template", "Edit questions", "Configure delivery", "Send"];
-  const stepIdx = ["pick", "template", "builder", "configure", "confirm"].indexOf(step);
+  const STEPS = ["Pick company", "Configure delivery", "Send"];
+  const stepIdx = ["pick", "configure", "confirm"].indexOf(step);
 
   return (
     <div style={{padding: "24px 36px"}}>
@@ -87,7 +87,7 @@ const SendSurvey = () => {
       </div>
       <h2 style={{margin: "4px 0 6px", fontSize: 22, fontWeight: 700, letterSpacing: "-0.01em"}}>Send new ESG survey</h2>
       <p style={{color: "var(--halo-text-2)", fontSize: 13, marginTop: 0, marginBottom: 22, maxWidth: 620}}>
-        Pick a company, choose a template, refine questions, and send a secure link.
+        Pick a company, configure delivery, and send the Stride Full Assessment — secure link auto-generated.
       </p>
 
       {/* Stepper */}
@@ -152,7 +152,7 @@ const SendSurvey = () => {
           <div style={{padding: "16px 24px", borderTop: "1px solid var(--halo-line)", display: "flex", justifyContent: "flex-end", gap: 10}}>
             <button className="btn btn-mint" disabled={!selected}
               style={!selected ? {opacity: 0.5, cursor: "not-allowed"} : {}}
-              onClick={() => selected && setStep("template")}>Continue<Icon name="chev" size={13} /></button>
+              onClick={() => selected && setStep("configure")}>Continue<Icon name="chev" size={13} /></button>
           </div>
         </div>
       )}
@@ -398,7 +398,7 @@ const SendSurvey = () => {
               <textarea value={body} onChange={e => setBody(e.target.value)} style={{...inputStyleBuilder, height: "auto", padding: "12px 14px", width: "100%", marginTop: 4, minHeight: 220, fontFamily: "inherit", lineHeight: 1.55, resize: "vertical"}} />
 
               <div style={{display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end"}}>
-                <button className="btn btn-ghost" onClick={() => setStep("builder")}><Icon name="arrowback" size={13} />Back</button>
+                <button className="btn btn-ghost" onClick={() => setStep("pick")}><Icon name="arrowback" size={13} />Back</button>
                 <button className="btn btn-mint" disabled={recipients.length === 0} style={recipients.length === 0 ? {opacity:0.5, cursor:"not-allowed"} : {}} onClick={() => recipients.length && setStep("confirm")}>
                   Review & send to {recipients.length || 0}<Icon name="chev" size={13} />
                 </button>
@@ -419,7 +419,7 @@ const SendSurvey = () => {
                 <div style={{marginTop: 10, color: "var(--halo-mint)", fontWeight: 600}}>→ Open survey link</div>
               </div>
               <div style={{fontSize: 11, color: "var(--halo-text-3)", marginTop: 10, lineHeight: 1.5}}>
-                {questions.length} questions · {sections.length} sections · template <strong>{TEMPLATES[template].name}</strong>
+                {questions.length} questions · {sections.length} sections · <strong>Stride Full Assessment</strong>
               </div>
             </div>
           </div>
