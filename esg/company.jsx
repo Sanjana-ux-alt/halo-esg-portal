@@ -274,6 +274,7 @@ window.CompanyDetail = CompanyDetail;
 // ─── Contact team popover ───────────────────────────────────
 const ContactTeamButton = ({ co }) => {
   const [open, setOpen] = React.useState(false);
+  const [ctab, setCtab] = React.useState("deal");
   const ref = React.useRef(null);
   React.useEffect(() => {
     if (!open) return;
@@ -282,11 +283,29 @@ const ContactTeamButton = ({ co }) => {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const team = [
-    { name: co.spoc, role: "Deal SPOC", email: co.spoc.toLowerCase().replace(/\s+/g, ".") + "@stride.vc", phone: "+91 98765 43210" },
-    { name: "Krishti Sharma", role: "ESG Lead", email: "krishti.sharma@stride.vc", phone: "+91 98123 44556" },
-    { name: "Aditi Rao", role: "Investment Associate", email: "aditi.rao@stride.vc", phone: "+91 99876 12345" },
+  const spocEmail = co.spoc.toLowerCase().replace(/\s+/g, ".") + "@stride.vc";
+  const CONTACTS = {
+    deal: [
+      { name: co.spoc,          role: "Deal Lead",             email: spocEmail,                    phone: "+91 98765 43210" },
+      { name: "Vikram Jain",    role: "Investment Associate",  email: "vikram.jain@stride.vc",      phone: "+91 99123 55678" },
+      { name: "Aditi Rao",      role: "Analyst",               email: "aditi.rao@stride.vc",        phone: "+91 99876 12345" },
+    ],
+    sent: [
+      { name: "Gaurav Sharma",  role: "CEO · " + co.name,     email: "gaurav@" + co.name.toLowerCase().replace(/\s+/g,"")+".com", phone: "+91 98001 11222" },
+      { name: "Priya Nair",     role: "CFO · " + co.name,     email: "priya@" + co.name.toLowerCase().replace(/\s+/g,"")+".com",  phone: "+91 98001 33444" },
+    ],
+    esg: [
+      { name: "Krishti Sharma", role: "ESG Lead",              email: "krishti.sharma@stride.vc",   phone: "+91 98123 44556" },
+      { name: "Ananya Mehta",   role: "ESG Analyst",           email: "ananya.mehta@stride.vc",     phone: "+91 97654 32109" },
+      { name: "Rohan Das",      role: "ESG Reviewer",          email: "rohan.das@stride.vc",        phone: "+91 96543 21098" },
+    ],
+  };
+  const TABS = [
+    { id: "deal", label: "Deal Team" },
+    { id: "sent", label: "Sent To" },
+    { id: "esg",  label: "ESG Team" },
   ];
+  const people = CONTACTS[ctab];
 
   return (
     <span style={{position: "relative", display: "inline-block"}} ref={ref}>
@@ -296,21 +315,33 @@ const ContactTeamButton = ({ co }) => {
         <Icon name="chev" size={10} />
       </button>
       {open && (
-        <div style={{position: "absolute", top: "calc(100% + 8px)", left: 0, width: 320, background: "white", borderRadius: 12, boxShadow: "0 12px 32px rgba(15,33,80,0.18)", zIndex: 20, overflow: "hidden"}}>
-          <div style={{padding: "12px 16px", borderBottom: "1px solid var(--halo-line-2)", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>
-            Deal team — {co.name}
+        <div style={{position: "absolute", top: "calc(100% + 8px)", left: 0, width: 340, background: "white", borderRadius: 12, boxShadow: "0 12px 32px rgba(15,33,80,0.18)", zIndex: 20, overflow: "hidden"}}>
+          {/* Tab strip */}
+          <div style={{display: "flex", borderBottom: "1px solid var(--halo-line-2)"}}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setCtab(t.id)} style={{
+                flex: 1, padding: "10px 6px", border: "none", cursor: "pointer",
+                background: "none", fontSize: 11.5, fontWeight: ctab === t.id ? 700 : 500,
+                color: ctab === t.id ? "var(--halo-navy)" : "var(--halo-text-3)",
+                borderBottom: "2px solid " + (ctab === t.id ? "var(--halo-navy)" : "transparent"),
+                transition: "all 150ms",
+              }}>
+                {t.label}
+              </button>
+            ))}
           </div>
-          {team.map((m, i) => (
+          {/* People */}
+          {people.map((m, i) => (
             <div key={i} style={{padding: "12px 16px", borderTop: i ? "1px solid var(--halo-line-2)" : "none"}}>
-              <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline"}}>
+              <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5}}>
                 <div style={{fontSize: 13, fontWeight: 700, color: "var(--halo-text)"}}>{m.name}</div>
                 <div style={{fontSize: 10, color: "var(--halo-text-3)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600}}>{m.role}</div>
               </div>
-              <div style={{display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--halo-text-2)", marginTop: 4}}>
+              <div style={{display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--halo-text-2)", marginTop: 2}}>
                 <Icon name="mail" size={11} color="#8B91AB" /><span>{m.email}</span>
               </div>
-              <div style={{display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--halo-text-2)", marginTop: 2}}>
-                <Icon name="bell" size={11} color="#8B91AB" /><span className="mono">{m.phone}</span>
+              <div style={{display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--halo-text-2)", marginTop: 3}}>
+                <Icon name="phone" size={11} color="#8B91AB" /><span className="mono">{m.phone}</span>
               </div>
             </div>
           ))}
