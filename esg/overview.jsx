@@ -1,23 +1,25 @@
 // HALO ESG — Overview / Assessments dashboard
 
-const KPI_DATA = [
-  { label: "Active Assessments", value: "12", delta: "+3", sub: "this quarter", color: "#22C28F", icon: "pipe", iconBg: "#DCF5EB", iconColor: "#1B7C5E" },
-  { label: "Pending My Review",  value: "4",  delta: "+1", sub: "since yesterday", color: "#E8A33D", icon: "clock", iconBg: "#FBF1DE", iconColor: "#8E5F18", deltaColor: "dn" },
-];
-
-const FILTER_TABS = [
-  { id: "all",         label: "All",         count: 12 },
-  { id: "completed",   label: "Completed",   count: 5 },
-  { id: "in-review",   label: "In Review",   count: 3 },
-  { id: "in-progress", label: "In Progress", count: 3 },
-  { id: "not-started", label: "Not Started", count: 1 },
-  { id: "overdue",     label: "Overdue",     count: 1, danger: true },
-];
-
 const Overview = () => {
   const [filter, setFilter] = React.useState("all");
   const [search, setSearch] = React.useState("");
-  const cos = window.HALO_ESG.COMPANIES.filter(c =>
+  // Live counts from real data
+  const ALL = window.HALO_ESG.COMPANIES;
+  const countBy = (s) => ALL.filter(c => c.status === s).length;
+  const KPI_DATA = [
+    { label: "Active Assessments", value: ALL.length, delta: `+${ALL.filter(c => c.status==='in-progress' || c.status==='in-review').length}`, sub: "this quarter", color: "#22C28F", icon: "pipe", iconBg: "#DCF5EB", iconColor: "#1B7C5E" },
+    { label: "Pending My Review",  value: countBy('in-review'),  delta: countBy('in-review') > 0 ? `+${countBy('in-review')}` : '0', sub: "since yesterday", color: "#E8A33D", icon: "clock", iconBg: "#FBF1DE", iconColor: "#8E5F18", deltaColor: "dn" },
+  ];
+  const FILTER_TABS = [
+    { id: "all",         label: "All",         count: ALL.length },
+    { id: "completed",   label: "Completed",   count: countBy('completed') },
+    { id: "in-review",   label: "In Review",   count: countBy('in-review') },
+    { id: "in-progress", label: "In Progress", count: countBy('in-progress') },
+    { id: "not-started", label: "Not Started", count: countBy('not-started') },
+    { id: "overdue",     label: "Overdue",     count: countBy('overdue'), danger: true },
+  ].filter(t => t.count > 0 || t.id === 'all');
+
+  const cos = ALL.filter(c =>
     (filter === "all" || c.status === filter) &&
     (!search || c.name.toLowerCase().includes(search.toLowerCase()))
   );

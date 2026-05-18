@@ -243,12 +243,19 @@ const Report = ({ companyId, embedded }) => {
   const sec = SCORING.sectorKey(co.sector);
   const computed = SCORING.computeScores(co.id);
   const r1 = x => Math.round((x || 0) * 10) / 10;
-  const scores = computed
+  // Prefer the Excel-truth values from data.jsx (co.score / e / s / g) when set,
+  // since those came directly from the Stride Ventures KPI Coverage sheet.
+  // Pillar MAX is always from computeScores (it depends on sector + active questions).
+  const hasExcelScore = co.score !== null && co.e !== null && co.s !== null && co.g !== null;
+  const scores = hasExcelScore
+    ? { e: co.e, s: co.s, g: co.g, total: co.score,
+        maxE: r1(computed?.eP?.m) || 25, maxS: r1(computed?.sP?.m) || 39, maxG: r1(computed?.gP?.m) || 36 }
+    : computed
     ? { e: r1(computed.eP.s), s: r1(computed.sP.s), g: r1(computed.gP.s), total: r1(computed.total),
         maxE: r1(computed.eP.m), maxS: r1(computed.sP.m), maxG: r1(computed.gP.m) }
-    : { e: 26.2, s: 28.1, g: 24.1, total: 78.4, maxE: 25, maxS: 39, maxG: 36 };
-  const tier = computed?.tier || 'L2';
-  const threshold = computed?.threshold || SCORING.PASS_THRESHOLDS[tier] || 30;
+    : { e: 0, s: 0, g: 0, total: 0, maxE: 25, maxS: 39, maxG: 36 };
+  const tier = co.tier || computed?.tier || 'L1';
+  const threshold = SCORING.PASS_THRESHOLDS[tier] || computed?.threshold || 15;
 
   // Topic lists per pillar (for formula tooltips)
   const eTopics = Object.entries(SCORING.TOPICS).filter(([k, t]) => t.pillar === 'E' && (t.w[sec] || 0) > 0);
@@ -266,7 +273,9 @@ const Report = ({ companyId, embedded }) => {
   const strongest = pillars.reduce((a, b) => a.pct >= b.pct ? a : b);
   const weakest = pillars.reduce((a, b) => a.pct <= b.pct ? a : b);
 
-  const assessmentSummary = `${co.name} scores ${scores.total}/100 overall, comfortably passing the Stride Ventures ESG threshold. ${strongest.name} is the strongest pillar at ${strongest.pct}% of its maximum, driven by above-sector diversity metrics and POSH compliance. ${weakest.name} is the primary improvement area at ${weakest.pct}%—focus on closing Scope 3 disclosure and supplier audit gaps to lift the score above 85.`;
+  // Verdict text adapts to actual pass/threshold + the strongest/weakest pillar
+  const verdictWord = scores.total >= threshold ? 'passing' : scores.total >= threshold * 0.6 ? 'within review range of' : 'below';
+  const assessmentSummary = `${co.name} (${co.sector} · Tier ${tier}) scores ${scores.total}/100 overall, ${verdictWord} the Stride Ventures ESG ${tier} threshold of ${threshold}. ${strongest.name} is the strongest pillar at ${strongest.pct}% of its sector maximum. ${weakest.name} is the primary improvement area at ${weakest.pct}% — focus efforts here to lift the overall score.`;
 
   // Priority improvements
   const improvements = [
@@ -298,8 +307,10 @@ const Report = ({ companyId, embedded }) => {
     <div className="fade-in">
       {!embedded && <HeaderBand
         title={`ESG Report — ${co.name}`}
-        badge="APPROVED"
-        subtitle={`Report ID ESG-2026-0428-${co.id.toUpperCase()} · Generated May 2, 2026 · Approved by Krishti Sharma`}
+        badge={hasScore ? "APPROVED" : (co.progress === 100 ? "IN REVIEW" : "IN PROGRESS")}
+        subtitle={hasScore
+          ? `Report ID ESG-2026-${co.id.toUpperCase()} · Tier ${tier} · ${reviewed ? `Approved ${reviewed}` : 'Under Review'} · Owner Krishti Sharma`
+          : `Survey ID ESG-2026-${co.id.toUpperCase()} · Tier ${tier} · ${sent ? `Sent ${sent}` : 'Not yet sent'} · ${co.progress}% complete`}
       />}
       {embedded && (
         <div style={{padding: "16px 36px 0", display: "flex", alignItems: "center", gap: 12}}>
@@ -540,41 +551,52 @@ const Report = ({ companyId, embedded }) => {
             </div>
           </div>
 
-          {/* Peer benchmarking */}
-          <div className="card" style={{marginTop: 22}}>
-            <div className="card-h">
-              <div>
-                <h3>Peer benchmarking</h3>
-                <div className="sub">Fintech / Lending sector · 6 comparable companies</div>
+          {/* Peer benchmarking — real Stride portcos in the same sector */}
+          {(() => {
+            const peers = window.HALO_ESG.COMPANIES
+              .filter(p => p.sector === co.sector && p.score !== null);
+            if (peers.length === 0) return null;
+            const avg = peers.reduce((s,p) => s + p.score, 0) / peers.length;
+            const fmtDelta = (s) => {
+              const d = s - avg;
+              const sign = d >= 0.05 ? '+' : d <= -0.05 ? '−' : '';
+              return sign + Math.abs(d).toFixed(1);
+            };
+            const sorted = [...peers].sort((a, b) => (b.score - a.score));
+            return (
+              <div className="card" style={{marginTop: 22}}>
+                <div className="card-h">
+                  <div>
+                    <h3>Peer benchmarking</h3>
+                    <div className="sub">{co.sector} sector · {peers.length} comparable Stride portcos · sector avg <span className="mono" style={{fontWeight:700}}>{avg.toFixed(1)}</span></div>
+                  </div>
+                </div>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{paddingLeft: 24}}>Company</th><th>Tier</th>
+                      <th>E</th><th>S</th><th>G</th><th>Total</th><th>Δ vs avg</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map((p, i) => {
+                      const isMe = p.id === co.id;
+                      const d = fmtDelta(p.score);
+                      return (
+                        <tr key={p.id} style={isMe ? {background: "#F2FBF7"} : {}}>
+                          <td style={{paddingLeft: 24, fontWeight: isMe ? 700 : 500}}>{p.name}{isMe && <span style={{marginLeft: 8, fontSize: 10, color: "#1B7C5E", fontWeight: 700}}>● THIS COMPANY</span>}</td>
+                          <td className="muted">{p.tier || '—'}</td>
+                          <td className="mono">{p.e}</td><td className="mono">{p.s}</td>
+                          <td className="mono">{p.g}</td><td className="mono" style={{fontWeight: 700}}>{p.score}</td>
+                          <td className="mono" style={{color: d.startsWith("+") ? "#1B7C5E" : d.startsWith("−") ? "#9F2D2D" : "var(--halo-text-3)", fontWeight: 600}}>{d}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th style={{paddingLeft: 24}}>Company</th><th>Stage</th>
-                  <th>E</th><th>S</th><th>G</th><th>Total</th><th>Δ vs avg</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { n: "WeRize WFin",      this: true,  s: "Active",        e: 26.2, so: 28.1, g: 24.1, t: 78.4, d: "+7.2" },
-                  { n: "Razorpay Capital", this: false, s: "Active",        e: 22.1, so: 26.8, g: 24.6, t: 73.5, d: "+2.3" },
-                  { n: "Alpha Capital",    this: false, s: "Documentation", e: 23.4, so: 25.8, g: 22.0, t: 71.2, d: "0.0" },
-                  { n: "PayU Lend",        this: false, s: "Active",        e: 21.8, so: 24.2, g: 23.8, t: 69.8, d: "−1.4" },
-                  { n: "KreditBee",        this: false, s: "Renewal",       e: 19.6, so: 23.1, g: 22.4, t: 65.1, d: "−6.1" },
-                  { n: "Lendingkart",      this: false, s: "Exited",        e: 24.0, so: 25.4, g: 23.0, t: 72.4, d: "+1.2" },
-                ].map((r,i) => (
-                  <tr key={i} style={r.this ? {background: "#F2FBF7"} : {}}>
-                    <td style={{paddingLeft: 24, fontWeight: r.this ? 700 : 500}}>{r.n}{r.this && <span style={{marginLeft: 8, fontSize: 10, color: "#1B7C5E", fontWeight: 700}}>● THIS COMPANY</span>}</td>
-                    <td className="muted">{r.s}</td>
-                    <td className="mono">{r.e}</td><td className="mono">{r.so}</td>
-                    <td className="mono">{r.g}</td><td className="mono" style={{fontWeight: 700}}>{r.t}</td>
-                    <td className="mono" style={{color: r.d.startsWith("+") ? "#1B7C5E" : r.d.startsWith("−") ? "#9F2D2D" : "var(--halo-text-3)", fontWeight: 600}}>{r.d}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            );
+          })()}
 
           {/* Recommendations */}
           <div className="card" style={{marginTop: 22}}>
@@ -610,9 +632,9 @@ const Report = ({ companyId, embedded }) => {
             <h3 style={{margin: "0 0 16px", fontSize: 15}}>Approval & sign-off</h3>
             <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18}}>
               {[
-                { r: "Reviewed by",  n: "Krishti Sharma", role: "Head of ESG",      d: "Apr 29, 2026", s: "completed"   },
-                { r: "Approved by",  n: "Akshat Gautam",  role: "Deal Partner",     d: "May 2, 2026",  s: "completed"   },
-                { r: "Acknowledged", n: "Vikram Jain",    role: "Founder, WeRize",  d: "Pending",      s: "in-progress" },
+                { r: "Reviewed by",  n: "Krishti Sharma", role: "Head of ESG",                    d: reviewed || "Pending", s: reviewed ? "completed" : "in-progress" },
+                { r: "Approved by",  n: "Akshat Gautam",  role: "Deal Partner",                   d: reviewed || "Pending", s: reviewed ? "completed" : "in-progress" },
+                { r: "Acknowledged", n: co.spoc,         role: `Founder, ${co.name}`,            d: "Pending",             s: "in-progress" },
               ].map((p,i) => (
                 <div key={i} style={{padding: 16, border: "1px solid var(--halo-line)", borderRadius: 10}}>
                   <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 8}}>{p.r}</div>

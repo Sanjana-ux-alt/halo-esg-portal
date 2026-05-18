@@ -63,11 +63,24 @@
     }
     return 0;
   };
+  // Accept arrays (real survey UI), raw count numbers, or Excel-style range strings
+  // like "1 to 3", "4 to 6", "7 to 10", "5+", "0", "None of the above".
   const countScore = (answer, brackets, none='None of the above') => {
-    if (!Array.isArray(answer) || answer.length === 0) return 0;
-    const cleaned = answer.filter(x => x !== none);
-    if (cleaned.length === 0) return 0;
-    const n = cleaned.length;
+    let n = -1;
+    if (Array.isArray(answer)) {
+      const cleaned = answer.filter(x => x !== none);
+      n = cleaned.length === 0 ? 0 : cleaned.length;
+    } else if (typeof answer === 'number') {
+      n = answer;
+    } else if (typeof answer === 'string') {
+      const s = answer.trim().toLowerCase();
+      if (s === '' || s === 'none of the above' || s === 'we do not track this' || s === '0') n = 0;
+      else if (/^\d+\+?$/.test(s))                     n = parseInt(s, 10);
+      else if (/^\d+\s*to\s*\d+$/i.test(s))            { const m = s.match(/(\d+)\s*to\s*(\d+)/i); n = Math.round((parseInt(m[1]) + parseInt(m[2]))/2); }
+      else if (/^\d+\s*or\s*more$/i.test(s))           n = parseInt(s.match(/(\d+)/)[1], 10);
+      else if (/not yet|plan to/.test(s))              n = 0;
+    }
+    if (n <= 0) return 0;
     for (const b of brackets) if (n >= b.min && n <= b.max) return b.score;
     return 0;
   };
@@ -503,66 +516,47 @@
   // ============================================================
   // 5. PER-COMPANY CONTACTS — for the Send Survey "Add recipient" dropdown
   // ============================================================
+  // POCs sourced from the raw answer-sheet "Name of the company POC" + "Designation"
+  // columns in the Stride Ventures_ESG KPI Coverage Summary Excel.
   const CONTACTS = {
-    wer: [
-      {name:'Niranjan Rathi',  role:'CEO',                       email:'niranjan@werize.com'},
-      {name:'Anita Iyer',      role:'CFO',                       email:'anita@werize.com'},
-      {name:'Dev Sharma',      role:'Head of Compliance',        email:'dev@werize.com'},
-    ],
-    alf: [
-      {name:'Siddharth Manohar',role:'CEO',                      email:'siddharth@alphacapital.in'},
-      {name:'Pratik Bose',      role:'COO',                      email:'pratik@alphacapital.in'},
-    ],
-    sid: [
-      {name:'Siddharth Manohar',role:'Founder',                  email:'sid@sidsco.com'},
-      {name:'Maya Krishnan',    role:'Operations Lead',          email:'maya@sidsco.com'},
-    ],
-    tap: [
-      {name:'Akshat Gautam',    role:'Founder & CEO',            email:'akshat@theaterapparel.com'},
-      {name:'Vikram Jain',      role:'Sustainability Officer',   email:'vikram@theaterapparel.com'},
-      {name:'Sneha Iyer',       role:'HR & People Lead',         email:'sneha@theaterapparel.com'},
-    ],
-    krv: [
-      {name:'Akshat Gautam',    role:'CEO',                      email:'akshat@krvvy.com'},
-      {name:'Tara Mukherjee',   role:'Head of Sustainability',   email:'tara@krvvy.com'},
-      {name:'Karan Bhatia',     role:'CFO',                      email:'karan@krvvy.com'},
-    ],
-    fct: [
-      {name:'Rohan Sethi',      role:'CEO',                      email:'rohan@firstclub.tech'},
-      {name:'Riya Patel',       role:'Head of People',           email:'riya@firstclub.tech'},
-    ],
-    nat: [
-      {name:'Priya Menon',      role:'CEO & Co-founder',         email:'priya@naturohabit.com'},
-      {name:'Manav Sharma',     role:'COO',                      email:'manav@naturohabit.com'},
-    ],
-    fln: [
-      {name:'Anaya Krishnan',   role:'Co-founder',               email:'anaya@slaash.in'},
-      {name:'Lavanya Reddy',    role:'Operations Lead',          email:'lavanya@slaash.in'},
-    ],
-    cpf: [
-      {name:'Rohan Sethi',      role:'Founder & CEO',            email:'rohan@captainfresh.com'},
-      {name:'Divya Nambiar',    role:'Head of Sustainability',   email:'divya@captainfresh.com'},
-      {name:'Rajesh Pillai',    role:'Supply Chain Director',    email:'rajesh@captainfresh.com'},
-    ],
-    ath: [
-      {name:'Vikram Jain',      role:'CEO',                      email:'vikram@atherenergy.com'},
-      {name:'Swapnil Jain',     role:'CTO',                      email:'swapnil@atherenergy.com'},
-      {name:'Devika Rao',       role:'Head of Sustainability',   email:'devika@atherenergy.com'},
-    ],
-    rzr: [
-      {name:'Vikram Jain',      role:'CEO',                      email:'vikram@razorpay.com'},
-      {name:'Shashank Kumar',   role:'CTO',                      email:'shashank@razorpay.com'},
-      {name:'Neha Pandit',      role:'Head of ESG & Impact',     email:'neha@razorpay.com'},
-    ],
-    frt: [
-      {name:'Anaya Krishnan',   role:'Founder',                  email:'anaya@fraternitas.in'},
-    ],
+    npl: [ {name:'Jitin Sacdeva',      role:'Director Finance',         email:'jitin@naturohabit.com'} ],
+    stp: [ {name:'Shail Daswani',      role:'Co-founder & CEO',         email:'shail@flent.in'} ],
+    ony: [ {name:'Krishti Sharma',     role:'ESG Liaison',              email:'krishti@onyadiamonds.com'} ],
+    fct: [ {name:'Rajib Chatterjee',   role:'Finance',                  email:'rajib@firstclub.tech'} ],
+    krv: [ {name:'Yash Goyal',         role:'Co-founder & CEO',         email:'yash@krvvy.com'} ],
+    mip: [ {name:'Manu Kumar Mittal',  role:'Director',                 email:'manu@medchain.io'} ],
+    uep: [ {name:'Aditya Mehra',       role:'Manager — Finance',        email:'aditya@uolo.com'} ],
+    rcp: [ {name:'Pratik Saraogi',     role:'Head of Strategy',         email:'pratik@riyaana.com'} ],
+    fvp: [ {name:'Mohit Jain',         role:'Business Head',            email:'mohit@fraternitas.in'} ],
+    bhi: [ {name:'Sanju Khanna',       role:'Head of Treasury',         email:'sanju@balancehero.com'} ],
+    gtp: [ {name:'Rimjim Deka',        role:'Director',                 email:'rimjim@goodtribe.in'} ],
+    ahb: [ {name:'Harish',             role:'Accountant',               email:'harish@allhomebharat.com'} ],
+    dhp: [ {name:'Harshit Kukreja',    role:'Co-Founder & Director',    email:'harshit@dunnwood.com'} ],
+    hex: [ {name:'Ishan',              role:'Manager',                  email:'ishan@hexalog.com'} ],
+    frn: [ {name:'Mahesh Majali',      role:'Director Finance',         email:'mahesh@furnishka.com'} ],
+    zuv: [ {name:'Gaurav Jhajharia',   role:'Finance Director',         email:'gaurav@zuvio.tech'} ],
+    plp: [ {name:'Bhisham Bhateja',    role:'Director',                 email:'bhisham@puresta.com'} ],
+    sam: [ {name:'Mayur Rastogi',      role:'Senior Manager Finance',   email:'mayur@samast.tech'} ],
+    ava: [ {name:'Ankit Khemka',       role:'Director',                 email:'ankit@avano.tech'} ],
+    cwt: [ {name:'Naveen Jain',        role:'Head of Finance',          email:'naveen@centricity.in'} ],
+    nbc: [ {name:'Ankesh Jain',        role:'Director',                 email:'ankesh@nothingbeforecoffee.in'} ],
+    fwc: [ {name:'Sandeep Dey',        role:'VP & Head — Corp Dev',     email:'sandeep@flatwhite.capital'} ],
+    urf: [ {name:'Raghavendra Degala', role:'Head, Investor Relations', email:'raghav@unrealfood.in'} ],
+    swi: [ {name:'Yogendra',           role:'Manager — Business Fin',   email:'yogendra@swish.in'} ],
+    mdo: [ {name:'Anisha V S',         role:'General Manager',          email:'anisha@mydesignation.com'} ],
+    tap: [ {name:'Vikram Jain',        role:'Director',                 email:'vikram@theaterapparel.com'} ],
+    ppl: [ {name:'Ananya Iyer',        role:'Sustainability Lead',      email:'ananya@protonas.in'} ],
+    brw: [ {name:'Sahil Mehta',        role:'Founder',                  email:'sahil@brewbay.in'} ],
+    cfp: [ {name:'Rajiv Pandey',       role:'Head of Compliance',       email:'rajiv@cashfree.com'} ],
+    swm: [ {name:'Anushka Gupta',      role:'Operations Lead',          email:'anushka@scripbox.com'} ],
+    giv: [ {name:'Ishendra Agarwal',   role:'Co-founder & CEO',         email:'ishendra@giva.co'} ],
+    ipp: [ {name:'Devraj Sharma',      role:'Head of Operations',       email:'devraj@ionic.pro'} ],
   };
 
   // ============================================================
   // 6. STATE — answers persist across screens via localStorage
   // ============================================================
-  const LS_KEY = 'halo-esg-state-v2';
+  const LS_KEY = 'halo-esg-state-v3-real';  // bumped to flush v2 demo state when real Excel data shipped
   const loadStored = () => {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; }
   };
@@ -649,86 +643,252 @@
   });
 
   // ============================================================
-  // 8. DEMO SEED — populate realistic answers and Q&A for completed
-  //    / in-review companies on first load so the Response/Review/Q&A
-  //    tabs aren't empty. Only runs if no state has been persisted yet.
+  // 8. REAL-COMPANY SEED — verbatim answers from the Stride Ventures
+  //    ESG KPI Coverage Excel (sheet "New Portcos_Fund III & Fund IV").
+  //    Only runs on first load (when localStorage is empty for v3-real).
   // ============================================================
   if (!persisted.answers || Object.keys(persisted.answers).length === 0) {
-    // Strong-performer answer set (used for completed companies)
-    const STRONG = {
-      training_topics: ['Technical development','Safety practices and procedures','Digital development and literacy','Compliance','Leadership development','Cybersecurity','Human Rights / DEI','Soft skills development'],
-      training_hrs:'40 - 60 hours per employee',
-      third_party_courses:'Yes, this option can be availed by most employees',
-      pct_women_org:'34', pct_women_blue:'8', pct_women_white:'28', pct_women_lead:'22', pct_diff_abled:'4',
-      jobs_created:'42', women_hired:'14', pwd_hired:'3', posh_redressal:'Yes',
-      water_sites:['Corporate Offices'], water_consumption:'< 500 Kilolitres', water_initiatives:'3', water_saved:'500 - 1000 Kilolitres',
-      energy_src:'Mix of Grid & Captive — primarily renewable', re_pct:'22', energy_eff_init:'4 or more', energy_savings:'18000', re_total_kwh:'45000',
-      scope12:'500 - 1000 tCO2', scope3:'We track some Scope 3 (partial data)', ghg_init:'2', ghg_saved:'500 - 1000 tCO2', ghg_intensity:'0.18',
-      haz_dispose:'Sell to industry / recycler directly', nonhaz_dispose:'Reuse / recycle / treat onsite', waste_reduce:'Yes',
-      ohs_practices:['OH&S policies & manuals','Emergency tools/equipment','Personal protective equipment','OH&S signage / emergency exits','Nominated OH&S reps & first-aiders','Record-keeping of all accidents'],
-      safety_drills:'Once every 2-6 months', incidents:'1-5',
-      collab_activities:'>5 activities', csr_amount:'>USD 20,000 spent', csr_sectors:['Poverty, health, sanitation','Education and employment','Gender equality / vulnerable groups','Environmental sustainability','Rural development','Educational institutions','Disaster management'],
-      cr_compliance:'Yes', cr_feedback:'Yes', cr_complaints:'5 - 10 complaints', cr_turnaround:'1-3 days',
-      policies:['Corporate Social Responsibility Policy','Environmental Management Policy','Occupational Health and Safety Policy','Anti-corruption / Anti-bribery','Human Rights','HR Policy / Employee Handbook','Diversity, Equity & Inclusion / POSH','Code of Ethics / Code of Conduct','Whistleblower Policy'],
-      certs:['ISO 14001 (env mgmt)','ISO 9001 (quality)','ISO 27001 (information security)'],
-      esg_gov:['Board-level ESG committee','ESG on board agenda','Dedicated ESG team / C-suite position','ESG goals & targets set','ESG roadmap / policy','Periodic ESG tracking'],
-      fines:'No',
-      data_breaches:'2 - 5 incidents', breach_resp:'Yes', data_laws:'Yes',
-      rd_spend:'1% - 5%',
-      supply_steps:['Undertaking/commitment from suppliers','Supplier Code of Conduct adherence','Supplier audits & evaluations'],
-      supplier_metrics:['Local suppliers (<200km)','Diversity ratio (women/minority-owned)'],
-      circular_yn:'Yes', circular_pct:'8',
-      fin_underserved_pct:'40',
-      hth_groups:['Rural population','Women','Economically weaker','The elderly'],
-      agri_traceability:'25',
+    const REAL_ANSWERS = {
+      npl: {  // Naturohabit — 69.6 total
+        water_sites: '2', water_consumption: '> 10,000 Kilolitres', water_initiatives: '4', water_saved: '5000 - 10,000 Kilolitres',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '4 or more', energy_savings: 0, re_total_kwh: 0, re_pct: 0,
+        scope12: '<500 tCO2', scope3: 'No, we do not track Scope 3', ghg_init: '2', ghg_saved: 'None of the above',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'Yes',
+        training_hrs: '40 - 60 hours per employee', third_party_courses: '2',
+        pct_women_org: 22, pct_women_blue: 10, pct_women_white: 12, pct_women_lead: 50, pct_diff_abled: 0,
+        jobs_created: 84, women_hired: 50, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '4', safety_drills: 'Once a month',
+        csr_sectors: '1 to 3', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '1-3 days',
+        policies: '7 to 10', certs: '0', esg_gov: '4 to 6', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '1% - 5%', supplier_metrics: '2',
+      },
+      fct: {  // FirstClub Technology — 49.3 total
+        water_sites: '2', water_consumption: '< 500 Kilolitres', water_initiatives: 'Not yet implemented but plan to in current year', water_saved: 'We do not track this',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '1', energy_savings: 0, re_total_kwh: 0, re_pct: 0,
+        scope12: '<500 tCO2', scope3: 'No, we do not track Scope 3', ghg_init: 'Plan to in current year', ghg_saved: 'No emission savings yet',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'Yes',
+        training_hrs: '<10 hours per employee', third_party_courses: '2',
+        pct_women_org: 20, pct_women_blue: 10, pct_women_white: 20, pct_women_lead: 20, pct_diff_abled: 0,
+        jobs_created: 0, women_hired: 0, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '2', safety_drills: 'Annually',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '<1 day',
+        policies: '1 to 3', certs: '0', esg_gov: '0', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '1% - 5%', supplier_metrics: '0',
+      },
+      krv: {  // Krvvy — 45.2 total
+        water_sites: 'Not yet tracked but plan to do so', water_consumption: 'We do not track this', water_initiatives: 'Not yet implemented but plan to in current year', water_saved: 'We do not track this',
+        energy_src: 'Only Electricity Grid', energy_eff_init: 'Plan to in current year', re_total_kwh: 0, re_pct: 0,
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'Plan to in current year', ghg_saved: 'Plan to calculate this year',
+        haz_dispose: 'Local municipality / municipal waste stream', nonhaz_dispose: 'Sell to industry / recycler directly', waste_reduce: 'Yes',
+        training_hrs: '<10 hours per employee', third_party_courses: 'Not yet tracked but plan to do so',
+        pct_women_org: 60, pct_women_blue: 0, pct_women_white: 60, pct_women_lead: 2, pct_diff_abled: 0,
+        jobs_created: 3, women_hired: 3, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '1', safety_drills: 'We do not do this',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '<1 day',
+        policies: '0', certs: '0', esg_gov: '0', fines: 'No',
+        data_breaches: 'Plan to start tracking this year', breach_resp: 'No', data_laws: 'No',
+        rd_spend: '1% - 5%', supplier_metrics: '2',
+      },
+      mip: {  // Medchain Innovation — 56.3 total
+        water_sites: 'Not yet tracked but plan to do so', water_consumption: 'We do not track this', water_initiatives: 'Not yet implemented but plan to in current year', water_saved: 'We do not track this',
+        energy_src: 'Mix of Grid & Captive — primarily renewable', energy_eff_init: 'Plan to in current year',
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'Plan to in current year', ghg_saved: 'Plan to calculate this year',
+        haz_dispose: 'Reuse / recycle / treat onsite', nonhaz_dispose: 'Reuse / recycle / treat onsite', waste_reduce: 'Yes',
+        training_hrs: 'We do not track this', third_party_courses: 'Not yet tracked but plan to do so',
+        pct_women_org: 25, pct_women_blue: 5, pct_women_white: 43, pct_women_lead: 0, pct_diff_abled: 0,
+        jobs_created: 2, women_hired: 0, pwd_hired: 0, posh_redressal: 'No',
+        ohs_practices: '5 or more', safety_drills: 'Once every 2-6 months',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '1-3 days',
+        policies: '4 to 6', certs: '0', esg_gov: '1 to 3', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '1% - 5%', supplier_metrics: '2',
+      },
+      uep: {  // Uolo Edtech — 63.5 total
+        water_sites: '2', water_consumption: 'We do not track this', water_initiatives: '3', water_saved: 'We do not track this',
+        energy_src: 'Mix of Grid & Captive — primarily non-renewable', energy_eff_init: '1', re_total_kwh: 0, re_pct: 0,
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'None of the above', ghg_saved: 'None of the above',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'Yes',
+        training_hrs: '10 - 20 hours per employee', third_party_courses: '2',
+        pct_women_org: 24, pct_women_blue: 0, pct_women_white: 24, pct_women_lead: 20, pct_diff_abled: 0,
+        jobs_created: 74, women_hired: 19, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '5 or more', safety_drills: 'Once every 2-6 months',
+        csr_sectors: '7 to 9', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '1-3 days',
+        policies: '7 to 10', certs: '0', esg_gov: '1 to 3', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '5% - 10%', supplier_metrics: '4',
+      },
+      ahb: {  // All Home Bharat — 26.3 total (lowest scorer)
+        water_sites: 'None of the above', water_consumption: 'We do not track this', water_initiatives: 'Not yet implemented but plan to in current year', water_saved: 'We do not track this',
+        energy_src: 'Only Electricity Grid', energy_eff_init: 'None of the above', re_total_kwh: 0, re_pct: 0,
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'None of the above', ghg_saved: 'No emission savings yet',
+        haz_dispose: 'Local municipality / municipal waste stream', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'No',
+        training_hrs: 'We do not track this', third_party_courses: 'None of the above',
+        pct_women_org: 30, pct_women_blue: 35, pct_women_white: 25, pct_women_lead: 5, pct_diff_abled: 0,
+        jobs_created: 35, women_hired: 2, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '2', safety_drills: 'Annually',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'No', cr_complaints: 'We do not track this', cr_turnaround: 'N/A',
+        policies: '1 to 3', certs: '0', esg_gov: '0', fines: 'No',
+        data_breaches: 'We do not track this', breach_resp: 'No', data_laws: 'No',
+        rd_spend: '1% - 5%', supplier_metrics: '0',
+      },
+      cwt: {  // Centricity Wealth Tech — 41.0 total
+        water_sites: 'None of the above', water_consumption: 'We do not track this', water_initiatives: 'None of the above', water_saved: 'We do not track this',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '1',
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'None of the above', ghg_saved: 'None of the above',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'No',
+        training_hrs: '20 - 40 hours per employee', third_party_courses: 'None of the above',
+        pct_women_org: 20, pct_women_blue: 10, pct_women_white: 90, pct_women_lead: 30, pct_diff_abled: 2,
+        jobs_created: 150, women_hired: 30, pwd_hired: 5, posh_redressal: 'Yes',
+        ohs_practices: '3', safety_drills: 'Once every 2-6 months',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '3-7 days',
+        policies: '4 to 6', certs: '0', esg_gov: '0', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: 'We do not spend money on R&D', supplier_metrics: '0',
+      },
+      nbc: {  // Nothing Before Coffee — 65.5 total
+        water_sites: '3', water_consumption: '1000 - 5000 Kilolitres', water_initiatives: '3', water_saved: '1000 - 5000 Kilolitres',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '2', energy_savings: 50000, re_pct: 5,
+        scope12: 'No data yet, plan to calculate this year', scope3: 'No data yet, plan to calculate this year', ghg_init: '1', ghg_saved: 'Plan to calculate this year',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'Yes',
+        training_hrs: '10 - 20 hours per employee', third_party_courses: '3',
+        pct_women_org: 25, pct_women_blue: 15, pct_women_white: 10, pct_women_lead: 10, pct_diff_abled: 1,
+        jobs_created: 85, women_hired: 40, pwd_hired: 2, posh_redressal: 'Yes',
+        ohs_practices: '1', safety_drills: 'Annually',
+        csr_sectors: '7 to 9', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '1-3 days',
+        policies: '4 to 6', certs: '1', esg_gov: '1 to 3', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '1% - 5%', supplier_metrics: '1',
+      },
+      fwc: {  // Flat White Capital — 64.4 total
+        water_sites: 'Not yet tracked but plan to do so', water_consumption: 'We do not track this', water_initiatives: 'Not yet implemented but plan to in current year', water_saved: 'We do not track this',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '2', re_total_kwh: 0, re_pct: 0,
+        scope12: '<500 tCO2', scope3: 'No, we do not track Scope 3', ghg_init: 'None of the above', ghg_saved: 'None of the above',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'N/A — no non-hazardous waste produced', waste_reduce: 'Yes',
+        training_hrs: '>60 hours per employee', third_party_courses: 'Not yet tracked but plan to do so',
+        pct_women_org: 29, pct_women_blue: 33, pct_women_white: 29, pct_women_lead: 25, pct_diff_abled: 0,
+        jobs_created: 100, women_hired: 30, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '5 or more', safety_drills: 'Once every 2-6 months',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '<1 day',
+        policies: '7 to 10', certs: '3', esg_gov: '0', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '>10%', supplier_metrics: '0',
+      },
+      tap: {  // Theater Apparel — 62.2 total
+        water_sites: 'Not yet tracked but plan to do so', water_consumption: '< 500 Kilolitres', water_initiatives: 'Not yet implemented but plan to in current year', water_saved: '< 500 Kilolitres',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '1', re_total_kwh: 0, re_pct: 0,
+        scope12: 'No data yet, plan to calculate this year', scope3: 'No data yet, plan to calculate this year', ghg_init: 'Plan to in current year', ghg_saved: 'Plan to calculate this year',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'Yes',
+        training_hrs: '<10 hours per employee', third_party_courses: 'Not yet tracked but plan to do so',
+        pct_women_org: 42, pct_women_blue: 39, pct_women_white: 44, pct_women_lead: 22, pct_diff_abled: 0,
+        jobs_created: 62, women_hired: 27, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '4', safety_drills: 'Once every 2-6 months',
+        csr_sectors: '1 to 3', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '<5 complaints', cr_turnaround: '<1 day',
+        policies: '4 to 6', certs: '0', esg_gov: '0', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '1% - 5%', supplier_metrics: '2',
+      },
+      swi: {  // Swish — 53.0 total
+        water_sites: '2', water_consumption: '5000 - 10,000 Kilolitres', water_initiatives: '2', water_saved: '< 500 Kilolitres',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '1', re_total_kwh: 0, re_pct: 0,
+        scope12: 'No data yet, plan to calculate this year', scope3: 'No data yet, plan to calculate this year', ghg_init: 'Plan to in current year', ghg_saved: 'Plan to calculate this year',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'Yes',
+        training_hrs: '20 - 40 hours per employee', third_party_courses: '2',
+        pct_women_org: 15, pct_women_blue: 12, pct_women_white: 20, pct_women_lead: 15, pct_diff_abled: 0,
+        jobs_created: 700, women_hired: 100, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '5 or more', safety_drills: 'Once every 2-6 months',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '10 - 20 complaints', cr_turnaround: '<1 day',
+        policies: '4 to 6', certs: '0', esg_gov: '0', fines: 'No',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'No',
+        rd_spend: '<0.5%', supplier_metrics: '1',
+      },
+      // ── In-review (submitted, not yet scored) — real answer-sheet data ──
+      ppl: {  // Protonas — submitted, weak across most pillars
+        water_sites: 'None of the above', water_consumption: 'We do not track this', water_initiatives: 'None of the above', water_saved: 'We do not track this',
+        energy_src: 'Only Electricity Grid', energy_eff_init: 'None of the above', energy_savings: 0, re_total_kwh: 0, re_pct: 0,
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'None of the above', ghg_saved: 'No emission savings yet',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'No',
+        training_hrs: '10 - 20 hours per employee', third_party_courses: 'None of the above',
+        pct_women_org: 22, pct_women_blue: 0, pct_women_white: 22, pct_women_lead: 0, pct_diff_abled: 0,
+        jobs_created: 5, women_hired: 0, pwd_hired: 5, posh_redressal: 'Yes',
+        ohs_practices: '3', safety_drills: 'Annually',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'No', cr_complaints: '<5 complaints', cr_turnaround: 'N/A',
+        policies: '1 to 3', certs: '0', esg_gov: '0',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '>10%', supplier_metrics: '1',
+      },
+      brw: {  // Brewbay — submitted
+        water_sites: '1', water_consumption: '< 500 Kilolitres', water_initiatives: 'None of the above', water_saved: 'We do not track this',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '3',
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'None of the above', ghg_saved: 'None of the above',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'Yes',
+        training_hrs: '20 - 40 hours per employee', third_party_courses: '1',
+        pct_women_org: 32, pct_women_blue: 27, pct_women_white: 5, pct_women_lead: 1, pct_diff_abled: 1,
+        jobs_created: 102, women_hired: 33, pwd_hired: 1, posh_redressal: 'Yes',
+        ohs_practices: '3', safety_drills: 'Annually',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '50+', cr_turnaround: '1-3 days',
+        policies: '4 to 6', certs: '0', esg_gov: '0',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '0.5% - 1%', supplier_metrics: '1',
+      },
+      cfp: {  // Cashfree Payments — submitted, fintech L3
+        water_sites: 'Not yet tracked but plan to do so', water_consumption: 'We do not track this', water_initiatives: 'None of the above', water_saved: 'We do not track this',
+        energy_src: 'Mix of Grid & Captive — primarily renewable', energy_eff_init: 'None of the above', energy_savings: 0, re_total_kwh: 0, re_pct: 0,
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'None of the above', ghg_saved: 'None of the above',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'No',
+        training_hrs: '10 - 20 hours per employee', third_party_courses: 'Not yet tracked but plan to do so',
+        pct_women_org: 25, pct_women_blue: 0, pct_women_white: 25, pct_women_lead: 20, pct_diff_abled: 0,
+        jobs_created: 1500, women_hired: 95, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '0', safety_drills: 'We do not do this',
+        csr_sectors: '1 to 3', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '5 - 10 complaints', cr_turnaround: '1-3 days',
+        policies: '7 to 10', certs: '2', esg_gov: '0',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '5% - 10%', supplier_metrics: '0',
+      },
+      swm: {  // Scripbox — submitted
+        water_sites: 'None of the above', water_consumption: 'We do not track this', water_initiatives: 'None of the above', water_saved: 'We do not track this',
+        energy_src: 'Only Electricity Grid', energy_eff_init: 'None of the above',
+        scope12: 'We do not track this', scope3: 'No, we do not track Scope 3', ghg_init: 'None of the above', ghg_saved: 'None of the above',
+        haz_dispose: 'N/A — no hazardous waste produced', nonhaz_dispose: 'Local municipality / municipal waste stream', waste_reduce: 'No',
+        training_hrs: 'We do not track this', third_party_courses: 'None of the above',
+        pct_women_org: 32, pct_women_blue: 0, pct_women_white: 32, pct_women_lead: 1, pct_diff_abled: 0,
+        jobs_created: 20, women_hired: 10, pwd_hired: 0, posh_redressal: 'Yes',
+        ohs_practices: '5 or more', safety_drills: 'Annually',
+        csr_sectors: '0', cr_compliance: 'Yes', cr_feedback: 'Yes', cr_complaints: '20 - 50 complaints', cr_turnaround: '<1 day',
+        policies: '1 to 3', certs: '1', esg_gov: '0',
+        data_breaches: 'Less than 2 incidents', breach_resp: 'Yes', data_laws: 'Yes',
+        rd_spend: '5% - 10%', supplier_metrics: '0',
+      },
+      // ── In-progress (still filling) — partial answers ──
+      giv: {  // GIVA — 64% complete
+        water_sites: 'Not yet tracked but plan to do so', water_consumption: 'We do not track this', water_initiatives: '3', water_saved: 'We do not track this',
+        energy_src: 'Mix of Grid & Captive — primarily renewable', energy_eff_init: '3', re_pct: 20,
+        scope12: 'No data yet, plan to calculate this year', scope3: 'No data yet, plan to calculate this year', ghg_init: '1', ghg_saved: 'Plan to calculate this year',
+        haz_dispose: 'Sell to industry / recycler directly', nonhaz_dispose: 'Sell to industry / recycler directly', waste_reduce: 'Yes',
+        training_hrs: '40 - 60 hours per employee', third_party_courses: 'Not yet tracked but plan to do so',
+        pct_women_org: 30, pct_women_blue: 60, pct_women_white: 20, pct_women_lead: 8, pct_diff_abled: 2,
+        jobs_created: 800, women_hired: 200, pwd_hired: 16, posh_redressal: 'Yes',
+      },
+      ipp: {  // Ionic Professional — 22% complete
+        water_sites: '2', water_consumption: '< 500 Kilolitres', water_initiatives: '3', water_saved: '< 500 Kilolitres',
+        energy_src: 'Only Electricity Grid', energy_eff_init: '2',
+        scope12: '<500 tCO2', scope3: 'No data yet, plan to calculate this year',
+      },
     };
-    // Mid-performer answer set (used for in-review)
-    const MID = { ...STRONG,
-      pct_women_lead:'12', pct_diff_abled:'2',
-      energy_src:'Only Electricity Grid', re_pct:'8', energy_eff_init:'2',
-      scope12:'1000 - 5000 tCO2', scope3:'No, we do not track Scope 3', ghg_init:'1', ghg_saved:'No emission savings yet',
-      certs:['ISO 9001 (quality)'],
-      esg_gov:['ESG on board agenda','ESG goals & targets set','Periodic ESG tracking'],
-      data_breaches:'5 - 10 incidents',
-      cr_complaints:'10 - 20 complaints', cr_turnaround:'3-7 days',
-      policies:['Corporate Social Responsibility Policy','HR Policy / Employee Handbook','Code of Ethics / Code of Conduct','Whistleblower Policy'],
-      water_initiatives:'1', water_saved:'We do not track this',
-      training_hrs:'10 - 20 hours per employee', training_topics:['Technical development','Safety practices and procedures','Compliance'],
-    };
-    // Partial answer set (used for in-progress)
-    const PARTIAL = {
-      pct_women_org:'22', pct_women_lead:'8', posh_redressal:'Yes',
-      training_topics:['Technical development','Compliance'],
-      water_sites:['Corporate Offices'], water_consumption:'< 500 Kilolitres',
-      energy_src:'Only Electricity Grid', re_pct:'0',
-      scope12:'We do not track this',
-      policies:['HR Policy / Employee Handbook','Code of Ethics / Code of Conduct'],
-      cr_feedback:'Yes', data_laws:'Yes',
-    };
-    const SEEDS = {
-      // Completed
-      wer:STRONG, fct:STRONG, nat:STRONG, ath:STRONG, rzr:STRONG,
-      // In-review
-      alf:MID, krv:MID,
-      // In-progress
-      sid:PARTIAL, tap:PARTIAL, cpf:PARTIAL,
-      // Not-started / overdue stay empty
-    };
-    Object.entries(SEEDS).forEach(([cid, payload]) => {
+    Object.entries(REAL_ANSWERS).forEach(([cid, payload]) => {
       STATE.answers[cid] = { ...payload };
     });
 
-    // Seed Q&A threads
-    STATE.qaQuestions['wer'] = [
-      { id:'qa_seed_1', from:'Niranjan Rathi', q:'For Scope 1+2 — should we include emissions from our leased Mumbai office?', time:'2 days ago', status:'answered', a:'Yes, please include all leased premises under operational control.', repliedBy:'Krishti Sharma', repliedTime:'2 days ago' },
-      { id:'qa_seed_2', from:'Niranjan Rathi', q:"We don't have a formal D&I policy yet. Is uploading a draft acceptable?", time:'4 days ago', status:'open' },
-    ];
-    STATE.qaQuestions['krv'] = [
-      { id:'qa_seed_3', from:'Akshat Gautam', q:'How should we report partial Scope 3 numbers — by category or aggregate?', time:'Yesterday', status:'open' },
-    ];
-    STATE.qaQuestions['cpf'] = [
-      { id:'qa_seed_4', from:'Rohan Sethi', q:'Can the file upload accept a Google Drive link instead of PDF?', time:'5 days ago', status:'answered', a:"We'd prefer a downloaded PDF; export the doc and upload directly.", repliedBy:'Krishti Sharma', repliedTime:'5 days ago' },
-    ];
+    // Pre-populate tier choices the deal team made when sending each survey,
+    // matched to the actual L1/L2/L3 column from the Excel scoring sheet.
+    STATE.companyTiers = {
+      npl:'L1', stp:'L1', ony:'L1', fct:'L1', krv:'L1', mip:'L1', uep:'L1', rcp:'L1',
+      fvp:'L1', bhi:'L3', gtp:'L2', ahb:'L1', dhp:'L1', hex:'L1', frn:'L1', zuv:'L1',
+      plp:'L1', sam:'L3', ava:'L1', cwt:'L3', nbc:'L1', fwc:'L1', urf:'L1', swi:'L1',
+      mdo:'L1', tap:'L1',
+      ppl:'L1', brw:'L1', cfp:'L3', swm:'L2', giv:'L2', ipp:'L1',
+    };
     persist();
   }
 })();

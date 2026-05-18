@@ -1,12 +1,15 @@
 // HALO ESG — Send Survey (pick → template → edit questions → send)
 
+// Real Stride Ventures portcos from the "Old Portcos_Fund II & Fund III" sheet
+// in the KPI Coverage Excel — they're due for re-survey under the current scoring
+// methodology and haven't been issued the v3 survey yet.
 const PROSPECTS = [
-  { id: "p1", name: "Bira 91",          sector: "Consumer / D2C",     stage: "Term Sheet",   spoc: "Anaya Krishnan", color: "#E25C5C", initials: "BR" },
-  { id: "p2", name: "Vinculum Solutions",sector: "B2B SaaS",          stage: "Diligence",    spoc: "Rohan Sethi",    color: "#6B6FBF", initials: "VS" },
-  { id: "p3", name: "Loadshare",        sector: "Mobility / Logistics",stage: "Diligence",   spoc: "Vikram Jain",    color: "#0F2150", initials: "LS" },
-  { id: "p4", name: "Smartworks",       sector: "Real Estate / SaaS", stage: "Documentation",spoc: "Akshat Gautam",  color: "#22C28F", initials: "SW" },
-  { id: "p5", name: "Country Delight",  sector: "Consumer / D2C",     stage: "Term Sheet",   spoc: "Priya Menon",    color: "#E8A33D", initials: "CD" },
-  { id: "p6", name: "Khatabook",        sector: "Fintech / SMB",      stage: "Prospect",     spoc: "Siddharth Manohar", color: "#0B1A3F", initials: "KB" },
+  { id: "moe", name: "MoEVing",          sector: "Cleantech / Mobility", stage: "Active",       spoc: "Vikash Mishra",       color: "#22C28F", initials: "MV" },
+  { id: "bts", name: "Battery Smart",    sector: "Cleantech / Mobility", stage: "Active",       spoc: "Pulkit Khurana",      color: "#6B6FBF", initials: "BS" },
+  { id: "eul", name: "Euler Motors",     sector: "Cleantech / Mobility", stage: "Active",       spoc: "Saurav Kumar",        color: "#0F2150", initials: "EM" },
+  { id: "ygb", name: "Yoga Bar",         sector: "Consumer / D2C",       stage: "Active",       spoc: "Anindita Sampath",    color: "#E25C5C", initials: "YB" },
+  { id: "hfy", name: "Healthifyme",      sector: "Healthtech",           stage: "Active",       spoc: "Tushar Vashisht",     color: "#E8A33D", initials: "HM" },
+  { id: "zwk", name: "Zetwerk",          sector: "B2B SaaS",             stage: "Active",       spoc: "Amrit Acharya",       color: "#0B1A3F", initials: "ZW" },
 ];
 
 const TEMPLATES = {
