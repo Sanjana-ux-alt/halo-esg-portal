@@ -930,6 +930,76 @@ const Review = ({ companyId, embedded }) => {
               </div>
             ))}
           </div>
+
+          {/* Contacts */}
+          {(() => {
+            const [ctab, setCtab] = React.useState("deal");
+            const CONTACT_DATA = {
+              deal: [
+                { name: co.spoc,          role: "Deal Lead",       initials: co.spoc.split(" ").map(w=>w[0]).join("").slice(0,2), color: "#0F2150" },
+                { name: "Vikram Jain",    role: "Associate",       initials: "VJ", color: "#6B6FBF" },
+                { name: "Anaya Krishnan", role: "Analyst",         initials: "AK", color: "#22C28F" },
+              ],
+              sent: [
+                { name: "Gaurav Sharma",  role: "CEO · " + co.name,  initials: "GS", color: "#E8A33D" },
+                { name: "Priya Nair",     role: "CFO · " + co.name,  initials: "PN", color: "#E25C5C" },
+              ],
+              esg: [
+                { name: "Krishti Sharma", role: "ESG Lead",        initials: "KS", color: "#0F2150" },
+                { name: "Ananya Mehta",   role: "ESG Analyst",     initials: "AM", color: "#6B6FBF" },
+                { name: "Rohan Das",      role: "ESG Reviewer",    initials: "RD", color: "#22C28F" },
+              ],
+            };
+            const tabs = [
+              { id: "deal", label: "Deal Team" },
+              { id: "sent", label: "Sent To" },
+              { id: "esg",  label: "ESG Team" },
+            ];
+            const people = CONTACT_DATA[ctab];
+            return (
+              <div className="card" style={{padding: 0, overflow: "hidden"}}>
+                {/* Tab strip */}
+                <div style={{display: "flex", borderBottom: "1px solid var(--halo-line-2)"}}>
+                  {tabs.map(t => (
+                    <button key={t.id} onClick={() => setCtab(t.id)} style={{
+                      flex: 1, padding: "10px 4px", border: "none", cursor: "pointer",
+                      background: "none", fontSize: 11, fontWeight: ctab === t.id ? 700 : 500,
+                      color: ctab === t.id ? "var(--halo-navy)" : "var(--halo-text-3)",
+                      borderBottom: "2px solid " + (ctab === t.id ? "var(--halo-navy)" : "transparent"),
+                      transition: "all 150ms", letterSpacing: "0.01em",
+                    }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {/* People list */}
+                <div style={{padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10}}>
+                  {people.map((p, i) => (
+                    <div key={i} style={{display: "flex", alignItems: "center", gap: 10}}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                        background: p.color, color: "white",
+                        display: "grid", placeItems: "center",
+                        fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
+                      }}>{p.initials}</div>
+                      <div style={{flex: 1, minWidth: 0}}>
+                        <div style={{fontSize: 13, fontWeight: 600, color: "var(--halo-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>{p.name}</div>
+                        <div style={{fontSize: 11, color: "var(--halo-text-3)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>{p.role}</div>
+                      </div>
+                      <div style={{display: "flex", gap: 6, flexShrink: 0}}>
+                        <button title="Send email" style={{width:26,height:26,borderRadius:6,border:"1px solid var(--halo-line)",background:"none",cursor:"pointer",display:"grid",placeItems:"center",color:"var(--halo-text-3)"}}>
+                          <Icon name="mail" size={12} />
+                        </button>
+                        <button title="Call" style={{width:26,height:26,borderRadius:6,border:"1px solid var(--halo-line)",background:"none",cursor:"pointer",display:"grid",placeItems:"center",color:"var(--halo-text-3)"}}>
+                          <Icon name="phone" size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
