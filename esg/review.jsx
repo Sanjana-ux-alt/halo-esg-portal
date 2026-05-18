@@ -92,7 +92,6 @@ const Review = ({ companyId, embedded }) => {
     { id: 'responses', label: 'Responses Reviewed',  desc: 'All founder answers have been read and verified by the ESG team.' },
     { id: 'flags',     label: 'Flags Addressed',     desc: 'All flagged and concern questions have been noted or resolved.' },
     { id: 'score',     label: 'Score Validated',     desc: 'ESG score has been computed and confirmed as accurate.' },
-    { id: 'qa',        label: 'Q&A Closed',           desc: 'All open founder questions have been answered.' },
     { id: 'signoff',   label: 'Final Sign-off',       desc: 'ESG lead formally approves this assessment for the IC.' },
   ];
   const [showApproval, setShowApproval] = React.useState(false);
@@ -248,7 +247,7 @@ const Review = ({ companyId, embedded }) => {
                   padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,
                 }}>
                 <Icon name="check" size={12} color={allChecked ? "white" : "#8B91AB"} />
-                Approve {allChecked ? "" : `(${Object.values(checkedSteps).filter(Boolean).length}/5)`}
+                Approve {allChecked ? "" : `(${Object.values(checkedSteps).filter(Boolean).length}/${APPROVAL_STEPS.length})`}
               </button>
             )}
           </div>
@@ -275,7 +274,7 @@ const Review = ({ companyId, embedded }) => {
                 Approve — {co.name}
               </div>
               <div style={{fontSize:12.5,color:"var(--halo-text-3)",marginTop:4}}>
-                Complete all 5 steps to enable final approval.
+                Complete all {APPROVAL_STEPS.length} steps to enable final approval.
               </div>
             </div>
 
@@ -385,7 +384,7 @@ const Review = ({ companyId, embedded }) => {
             <div style={{margin:"20px 0 22px"}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--halo-text-3)",marginBottom:6}}>
                 <span>
-                  {approvedCount} of 5 approved
+                  {approvedCount} of {APPROVAL_STEPS.length} approved
                   {inReviewCount > 0 && <span style={{color:"#8E5F18",marginLeft:6}}>· {inReviewCount} in review</span>}
                 </span>
                 {allChecked && <span style={{color:"#1B7C5E",fontWeight:700}}>✓ Ready to confirm</span>}
@@ -394,13 +393,13 @@ const Review = ({ companyId, embedded }) => {
                 <div style={{
                   position:"absolute",left:0,top:0,height:"100%",borderRadius:99,
                   background:"#F0D5A0",
-                  width:((approvedCount+inReviewCount)/5*100)+"%",
+                  width:((approvedCount+inReviewCount)/APPROVAL_STEPS.length*100)+"%",
                   transition:"width 300ms",
                 }} />
                 <div style={{
                   position:"absolute",left:0,top:0,height:"100%",borderRadius:99,
                   background:"var(--halo-mint)",
-                  width:(approvedCount/5*100)+"%",
+                  width:(approvedCount/APPROVAL_STEPS.length*100)+"%",
                   transition:"width 300ms",
                 }} />
               </div>

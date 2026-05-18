@@ -61,7 +61,6 @@ const CompanyDetail = ({ companyId }) => {
           { id: "report",     label: "Report",             icon: "folder", disabled: !scored },
           { id: "review",     label: "Review",             icon: "brain", disabled: !filled },
           { id: "submission", label: "Submitted Response", icon: "folder" },
-          { id: "qna",        label: "Q&A",                icon: "mail" },
         ].map(t => {
           const active = tab === t.id;
           return (
@@ -87,7 +86,6 @@ const CompanyDetail = ({ companyId }) => {
       </div>
 
       {tab === "submission" && <Submission co={co} />}
-      {tab === "qna"        && <FounderQA co={co} />}
       {tab === "review" && filled && <Review companyId={co.id} embedded />}
       {tab === "report" && scored && <Report companyId={co.id} embedded />}
     </div>
@@ -180,91 +178,6 @@ const Submission = ({ co }) => {
           </div>
         </div>
       ))}
-    </div>
-  );
-};
-
-// ─── Founder Q&A — reads real questions from STATE.qaQuestions ───
-const FounderQA = ({ co }) => {
-  // Track tick so we re-render after replyQuestion mutates STATE
-  const [tick, setTick] = React.useState(0);
-  const [drafts, setDrafts] = React.useState({}); // { [qid]: text }
-
-  const thread = window.HALO_ESG.STATE.qaQuestions[co.id] || [];
-  const open    = thread.filter(q => q.status === "open").length;
-  const ansd    = thread.filter(q => q.status === "answered").length;
-
-  const sendReply = (qid) => {
-    const text = (drafts[qid] || '').trim();
-    if (!text) return;
-    window.HALO_ESG.replyQuestion(co.id, qid, text);
-    setDrafts({ ...drafts, [qid]: '' });
-    setTick(t => t + 1);
-  };
-
-  return (
-    <div style={{padding: "24px 36px"}}>
-      <div style={{display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 14}}>
-        <div>
-          <h2 style={{margin: 0, fontSize: 18, fontWeight: 700}}>Questions from {co.name}</h2>
-          <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 4}}>
-            {co.spoc.split(' ')[0]} can ask questions from the "Ask the ESG team" panel on the survey form.
-          </div>
-        </div>
-        <div style={{fontSize: 12, color: "var(--halo-text-3)"}}>
-          {open} open · {ansd} answered
-        </div>
-      </div>
-
-      {thread.length === 0 && (
-        <div className="card card-pad" style={{textAlign: "center", padding: 40}}>
-          <div style={{display: "inline-grid", placeItems: "center", width: 52, height: 52, borderRadius: 13, background: "#E6E7F4", color: "#45489B", marginBottom: 12}}>
-            <Icon name="help" size={22} />
-          </div>
-          <div style={{fontSize: 15, fontWeight: 700}}>No questions yet</div>
-          <div style={{fontSize: 13, color: "var(--halo-text-3)", marginTop: 4, maxWidth: 420, margin: "4px auto 0"}}>
-            When {co.spoc.split(' ')[0]} asks a question from the survey form, it'll appear here for you to reply.
-          </div>
-        </div>
-      )}
-
-      <div style={{display: "flex", flexDirection: "column", gap: 12}}>
-        {thread.map((q) => (
-          <div key={q.id} className="card card-pad">
-            <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8}}>
-              <div style={{fontSize: 12, color: "var(--halo-text-3)"}}>
-                <strong style={{color: "var(--halo-text)"}}>{q.from}</strong> · {q.time}
-              </div>
-              <span style={{
-                fontSize: 10, letterSpacing: "0.14em", fontWeight: 800, padding: "3px 8px", borderRadius: 4,
-                background: q.status === "open" ? "var(--halo-amber-soft)" : "var(--halo-mint-soft)",
-                color: q.status === "open" ? "#8E5F18" : "#1B7C5E",
-              }}>{q.status === "open" ? "OPEN" : "ANSWERED"}</span>
-            </div>
-            <div style={{fontSize: 14, fontWeight: 600, color: "var(--halo-text)", lineHeight: 1.5}}>{q.q}</div>
-            {q.status === "answered" ? (
-              <div style={{marginTop: 10, padding: "10px 12px", background: "#F2FBF7", borderRadius: 8, fontSize: 13, color: "var(--halo-text-2)", lineHeight: 1.5}}>
-                <strong style={{color: "var(--halo-mint)"}}>{q.repliedBy || 'Krishti'} replied{q.repliedTime ? ` · ${q.repliedTime}` : ''}:</strong> {q.a}
-              </div>
-            ) : (
-              <div style={{marginTop: 10, display: "flex", gap: 8}}>
-                <input
-                  placeholder={`Reply to ${q.from}…`}
-                  value={drafts[q.id] || ''}
-                  onChange={e => setDrafts({ ...drafts, [q.id]: e.target.value })}
-                  onKeyDown={e => { if (e.key === 'Enter') sendReply(q.id); }}
-                  style={{flex: 1, height: 36, padding: "0 12px", border: "1px solid var(--halo-line)", borderRadius: 8, fontSize: 13, outline: "none"}}
-                />
-                <button className="btn btn-mint" disabled={!(drafts[q.id] || '').trim()}
-                  style={!(drafts[q.id] || '').trim() ? {opacity:0.55,cursor:"not-allowed"} : {}}
-                  onClick={() => sendReply(q.id)}>
-                  <Icon name="send" size={13} />Reply
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
     </div>
   );
 };

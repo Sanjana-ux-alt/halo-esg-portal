@@ -15,6 +15,10 @@ const FounderView = ({ companyId }) => {
   const co = window.HALO_ESG.COMPANIES.find(c => c.id === companyId) || window.HALO_ESG.COMPANIES[0];
   const SCORING = window.HALO_ESG.SCORING;
 
+  // Role-aware edit gating: ESG can edit, deal/risk are read-only, founders (no role) can always fill
+  const role = window.HALO_ROLE;
+  const canEdit = role ? !!(window.HALO_PERMS?.canEdit) : true;
+
   // Step 0: sector selection (always show so founder can confirm/change)
   const [sectorSelected, setSectorSelected] = React.useState(co.sector || null);
   const [sectorConfirmed, setSectorConfirmed] = React.useState(false);
@@ -61,9 +65,9 @@ const FounderView = ({ companyId }) => {
       gap: 16, fontSize: 12,
     }}>
       <div style={{display: "flex", alignItems: "center", gap: 10, minWidth: 0}}>
-        <Icon name="shield" size={13} color="#8B91AB" />
-        <span style={{color: "#ADB3CE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
-          Secure response form · auto-saved as you go
+        <Icon name={role === 'esg' ? "pen" : "shield"} size={13} color={role === 'esg' ? "#22C28F" : "#8B91AB"} />
+        <span style={{color: role === 'esg' ? "#A7EBC9" : !canEdit ? "#F2C77F" : "#ADB3CE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
+          {role === 'esg' ? `ESG Team — editing ${co.name}'s responses` : !canEdit ? "Read-only view — editing not permitted for your role" : "Secure response form · auto-saved as you go"}
         </span>
       </div>
       <button onClick={() => window.HALO_NAV("company", co.id)}
@@ -190,6 +194,20 @@ const FounderView = ({ companyId }) => {
           </div>
         </div>
 
+        {/* Role banner */}
+        {role === 'esg' && (
+          <div style={{display: "flex", alignItems: "center", gap: 10, background: "#F2FBF7", border: "1px solid #B8EDD8", borderRadius: 10, padding: "10px 16px", marginBottom: 12, fontSize: 12, color: "#1B7C5E", fontWeight: 600}}>
+            <Icon name="pen" size={13} color="#22C28F" />
+            ESG edit mode — changes save immediately to the company's record.
+          </div>
+        )}
+        {!canEdit && role && (
+          <div style={{display: "flex", alignItems: "center", gap: 10, background: "#FFF7EC", border: "1px solid #F0D5A0", borderRadius: 10, padding: "10px 16px", marginBottom: 12, fontSize: 12, color: "#8E5F18", fontWeight: 600}}>
+            <Icon name="shield" size={13} color="#E8A33D" />
+            Read-only — your role ({role === 'deal' ? 'Deal Team' : 'Risk Team'}) can view but not edit responses.
+          </div>
+        )}
+
         {/* Sector badge + change link */}
         <div style={{display: "flex", alignItems: "center", gap: 10, marginBottom: 18}}>
           <span style={{
@@ -230,7 +248,7 @@ const FounderView = ({ companyId }) => {
               </div>
               <div>
                 {g.items.map((q, i) => (
-                  <FounderQuestion key={q.id} q={q} value={ans[q.id]} onChange={(v) => setAns(q.id, v)} index={i} />
+                  <FounderQuestion key={q.id} q={q} value={ans[q.id]} onChange={(v) => canEdit && setAns(q.id, v)} index={i} canEdit={canEdit} />
                 ))}
               </div>
             </div>
@@ -239,14 +257,22 @@ const FounderView = ({ companyId }) => {
           {/* Footer */}
           <div style={{background: "white", borderRadius: 14, padding: "20px 24px", boxShadow: "var(--halo-shadow)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16}}>
             <div>
-              <div style={{fontSize: 14, fontWeight: 700}}>{pct === 100 ? "Ready to submit" : "Save and continue later"}</div>
+              <div style={{fontSize: 14, fontWeight: 700}}>
+                {!canEdit && role ? "Viewing response form" : pct === 100 ? "Ready to submit" : "Save and continue later"}
+              </div>
               <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 2}}>
-                Your progress is auto-saved. {pct < 100 ? `${allQs.length - answeredCount} questions remaining.` : 'All questions answered.'}
+                {!canEdit && role ? "You have view-only access to this form." : `Your progress is auto-saved. ${pct < 100 ? `${allQs.length - answeredCount} questions remaining.` : 'All questions answered.'}`}
               </div>
             </div>
-            <button className="btn btn-mint" disabled={pct < 100} style={pct < 100 ? {opacity:0.55,cursor:"not-allowed"} : {}}>
-              <Icon name="check" size={13} />Submit for review
-            </button>
+            {canEdit || !role ? (
+              <button className="btn btn-mint" disabled={pct < 100} style={pct < 100 ? {opacity:0.55,cursor:"not-allowed"} : {}}>
+                <Icon name="check" size={13} />Submit for review
+              </button>
+            ) : (
+              <button className="btn btn-outline" onClick={() => window.HALO_NAV("company", co.id)}>
+                <Icon name="arrowback" size={13} />Back to {co.name}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -308,9 +334,9 @@ const FounderSectionStatus = ({ items, ans }) => {
 };
 
 // ── Question renderer ──
-const FounderQuestion = ({ q, value, onChange, index }) => {
+const FounderQuestion = ({ q, value, onChange, index, canEdit = true }) => {
   return (
-    <div style={{padding: "16px 24px", borderTop: index ? "1px solid var(--halo-line-2)" : "none"}}>
+    <div style={{padding: "16px 24px", borderTop: index ? "1px solid var(--halo-line-2)" : "none", opacity: canEdit ? 1 : 0.82}}>
       <div style={{display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10}}>
         <div style={{fontSize: 13.5, fontWeight: 600, color: "var(--halo-text)", lineHeight: 1.45}}>
           <span style={{color: "var(--halo-text-3)", fontWeight: 600, marginRight: 8, fontFamily: "JetBrains Mono, monospace", fontSize: 12}}>Q{index + 1}</span>
@@ -318,25 +344,25 @@ const FounderQuestion = ({ q, value, onChange, index }) => {
         </div>
         <div style={{fontSize: 11, color: "var(--halo-text-3)", whiteSpace: "nowrap", flexShrink: 0}}>{q.type}</div>
       </div>
-      <FounderInput q={q} value={value} onChange={onChange} />
+      <FounderInput q={q} value={value} onChange={onChange} canEdit={canEdit} />
     </div>
   );
 };
 
-const FounderInput = ({ q, value, onChange }) => {
+const FounderInput = ({ q, value, onChange, canEdit = true }) => {
   if (q.type === 'Yes / No') {
     return (
       <div style={{display: "flex", gap: 10}}>
         {['Yes','No'].map(v => {
           const active = value === v;
           return (
-            <button key={v} onClick={() => onChange(v)}
+            <button key={v} onClick={() => canEdit && onChange(v)}
               style={{
                 flex: 1, padding: "12px 16px", borderRadius: 10, fontSize: 13.5, fontWeight: 600,
                 border: active ? "1.5px solid var(--halo-mint)" : "1px solid var(--halo-line)",
                 background: active ? "#F2FBF7" : "white",
                 color: active ? "#1B7C5E" : "var(--halo-text-2)",
-                cursor: "pointer", transition: "all 120ms",
+                cursor: canEdit ? "pointer" : "default", transition: "all 120ms",
               }}>
               {v}
             </button>
@@ -348,13 +374,14 @@ const FounderInput = ({ q, value, onChange }) => {
 
   if (q.type === 'Number') {
     return (
-      <div style={{display: "flex", alignItems: "center", gap: 10, maxWidth: 320, border: "1px solid var(--halo-line)", borderRadius: 9, background: "white", padding: "0 14px"}}>
+      <div style={{display: "flex", alignItems: "center", gap: 10, maxWidth: 320, border: "1px solid var(--halo-line)", borderRadius: 9, background: canEdit ? "white" : "#F7F8FC", padding: "0 14px"}}>
         <input
           type="number" step="any"
           value={value ?? ''}
-          onChange={e => onChange(e.target.value)}
+          onChange={e => canEdit && onChange(e.target.value)}
+          readOnly={!canEdit}
           placeholder="0"
-          style={{flex: 1, border: "none", outline: "none", padding: "11px 0", fontFamily: "JetBrains Mono, monospace", fontSize: 14, background: "transparent"}}
+          style={{flex: 1, border: "none", outline: "none", padding: "11px 0", fontFamily: "JetBrains Mono, monospace", fontSize: 14, background: "transparent", cursor: canEdit ? "auto" : "default"}}
         />
         {q.unit && <span style={{fontSize: 12, color: "var(--halo-text-3)"}}>{q.unit}</span>}
       </div>
@@ -370,8 +397,9 @@ const FounderInput = ({ q, value, onChange }) => {
           <input
             type="range" min={0} max={100} step={1}
             value={display}
-            onChange={e => onChange(e.target.value)}
-            style={{flex: 1, accentColor: "var(--halo-mint)"}}
+            onChange={e => canEdit && onChange(e.target.value)}
+            disabled={!canEdit}
+            style={{flex: 1, accentColor: "var(--halo-mint)", cursor: canEdit ? "pointer" : "default"}}
           />
           <span className="mono" style={{fontSize: 14, fontWeight: 700, color: "var(--halo-text)", minWidth: 56, textAlign: "right"}}>{display}{q.unit || '%'}</span>
         </div>
@@ -386,13 +414,13 @@ const FounderInput = ({ q, value, onChange }) => {
         {opts.map(o => {
           const active = value === o.l;
           return (
-            <button key={o.l} onClick={() => onChange(o.l)}
+            <button key={o.l} onClick={() => canEdit && onChange(o.l)}
               style={{
                 display: "flex", alignItems: "center", gap: 10,
                 padding: "11px 14px", borderRadius: 9, fontSize: 13.5,
                 border: active ? "1.5px solid var(--halo-mint)" : "1px solid var(--halo-line)",
                 background: active ? "#F2FBF7" : "white",
-                cursor: "pointer", transition: "all 120ms", textAlign: "left",
+                cursor: canEdit ? "pointer" : "default", transition: "all 120ms", textAlign: "left",
                 color: active ? "var(--halo-text)" : "var(--halo-text-2)",
                 fontWeight: active ? 600 : 500,
               }}>
@@ -413,6 +441,7 @@ const FounderInput = ({ q, value, onChange }) => {
     const opts = (q.opts || []).map(o => typeof o === 'string' ? {l: o} : o);
     const selected = Array.isArray(value) ? value : [];
     const toggle = (l) => {
+      if (!canEdit) return;
       if (selected.includes(l)) onChange(selected.filter(x => x !== l));
       else onChange([...selected, l]);
     };
@@ -427,7 +456,7 @@ const FounderInput = ({ q, value, onChange }) => {
                 padding: "11px 14px", borderRadius: 9, fontSize: 13.5,
                 border: active ? "1.5px solid var(--halo-mint)" : "1px solid var(--halo-line)",
                 background: active ? "#F2FBF7" : "white",
-                cursor: "pointer", transition: "all 120ms", textAlign: "left",
+                cursor: canEdit ? "pointer" : "default", transition: "all 120ms", textAlign: "left",
                 color: active ? "var(--halo-text)" : "var(--halo-text-2)",
                 fontWeight: active ? 600 : 500,
               }}>
@@ -450,8 +479,9 @@ const FounderInput = ({ q, value, onChange }) => {
   // Fallback
   return (
     <input
-      type="text" value={value ?? ''} onChange={e => onChange(e.target.value)}
-      style={{width: "100%", height: 38, padding: "0 12px", border: "1px solid var(--halo-line)", borderRadius: 9, fontSize: 13, outline: "none"}}
+      type="text" value={value ?? ''} onChange={e => canEdit && onChange(e.target.value)}
+      readOnly={!canEdit}
+      style={{width: "100%", height: 38, padding: "0 12px", border: "1px solid var(--halo-line)", borderRadius: 9, fontSize: 13, outline: "none", background: canEdit ? "white" : "#F7F8FC"}}
     />
   );
 };
