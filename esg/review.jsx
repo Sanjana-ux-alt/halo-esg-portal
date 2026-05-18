@@ -335,6 +335,19 @@ const Review = ({ companyId, embedded }) => {
                             <Icon name="clock" size={10} color="#E8A33D" />In Review
                           </button>
                         )}
+                        {isInReview && (
+                          <button
+                            onClick={() => setStepConfirmModal({ id: step.id, label: step.label })}
+                            title="Approve again"
+                            style={{
+                              display:"inline-flex",alignItems:"center",gap:4,flexShrink:0,
+                              background:"#F2FBF7",border:"1px solid #B8EDD8",borderRadius:6,
+                              padding:"3px 8px",cursor:"pointer",color:"#1B7C5E",
+                              fontSize:10,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",
+                            }}>
+                            <Icon name="check" size={10} color="#22C28F" stroke={2.5} />Approve
+                          </button>
+                        )}
                       </div>
                       <div style={{fontSize:11.5,color:"var(--halo-text-3)",marginTop:2,lineHeight:1.5}}>
                         {step.desc}
