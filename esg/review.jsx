@@ -71,12 +71,30 @@ const Review = ({ companyId, embedded }) => {
     { id: 'qa',        label: 'Q&A Closed',           desc: 'All open founder questions have been answered.' },
     { id: 'signoff',   label: 'Final Sign-off',       desc: 'ESG lead formally approves this assessment for the IC.' },
   ];
+  const REVIEWER = "Krishti Sharma";
+  const nowStr = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const [showApproval, setShowApproval] = React.useState(false);
+  const [showApprovalRecord, setShowApprovalRecord] = React.useState(false);
   const [checkedSteps, setCheckedSteps] = React.useState({});
+  const [approvalComment, setApprovalComment] = React.useState("");
   const [isApproved, setIsApproved] = React.useState(false);
+  const [approvalRecord, setApprovalRecord] = React.useState(null);
   const allChecked = APPROVAL_STEPS.every(s => checkedSteps[s.id]);
-  const toggleStep = (id) => setCheckedSteps(prev => ({...prev, [id]: !prev[id]}));
-  const confirmApproval = () => { setIsApproved(true); setShowApproval(false); };
+  const toggleStep = (id) => setCheckedSteps(prev => {
+    if (prev[id]) { const n = {...prev}; delete n[id]; return n; }
+    return {...prev, [id]: { by: REVIEWER, time: nowStr() }};
+  });
+  const confirmApproval = () => {
+    const rec = {
+      steps: APPROVAL_STEPS.map(s => ({ ...s, ...(checkedSteps[s.id] || {}) })),
+      comment: approvalComment.trim(),
+      finalBy: REVIEWER,
+      finalTime: nowStr(),
+    };
+    setApprovalRecord(rec);
+    setIsApproved(true);
+    setShowApproval(false);
+  };
   const addComment = (qid, sendToFounder) => {
     if (!draft.trim()) return;
     setComments({...comments, [qid]: [...(comments[qid] || []), { author: "Krishti Sharma", time: "Just now", text: draft.trim(), sentToFounder }]});
@@ -179,9 +197,13 @@ const Review = ({ companyId, embedded }) => {
           </span>
           <div style={{marginLeft: "auto"}}>
             {isApproved ? (
-              <span style={{display:"inline-flex",alignItems:"center",gap:6,background:"#F2FBF7",border:"1.5px solid #22C28F",color:"#1B7C5E",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700}}>
-                <Icon name="check" size={13} color="#22C28F" />Assessment Approved
-              </span>
+              <button
+                onClick={() => setShowApprovalRecord(true)}
+                style={{display:"inline-flex",alignItems:"center",gap:6,background:"#F2FBF7",border:"1.5px solid #22C28F",color:"#1B7C5E",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                <Icon name="check" size={13} color="#22C28F" />
+                Assessment Approved
+                <span style={{opacity:0.6,fontWeight:500,marginLeft:2}}>· View</span>
+              </button>
             ) : (
               <button
                 className="btn btn-sm"
@@ -228,7 +250,8 @@ const Review = ({ companyId, embedded }) => {
             {/* Steps */}
             <div style={{display:"flex",flexDirection:"column",gap:0}}>
               {APPROVAL_STEPS.map((step, i) => {
-                const done = !!checkedSteps[step.id];
+                const stepData = checkedSteps[step.id];
+                const done = !!stepData;
                 return (
                   <div key={step.id} style={{display:"flex",gap:16,alignItems:"flex-start",marginBottom:8}}>
                     {/* Circle + connector */}
@@ -248,17 +271,25 @@ const Review = ({ companyId, embedded }) => {
                         }
                       </button>
                       {i < APPROVAL_STEPS.length - 1 && (
-                        <div style={{width:2,height:14,background: done ? "var(--halo-mint)" : "#E6E7F4",borderRadius:1,margin:"3px 0"}} />
+                        <div style={{width:2,height:done ? 28 : 18,background: done ? "var(--halo-mint)" : "#E6E7F4",borderRadius:1,margin:"3px 0",transition:"all 200ms"}} />
                       )}
                     </div>
                     {/* Text */}
-                    <div style={{paddingTop:6,paddingBottom:i < APPROVAL_STEPS.length-1 ? 14 : 0}}>
+                    <div style={{paddingTop:6,paddingBottom:i < APPROVAL_STEPS.length-1 ? 6 : 0,minHeight:36}}>
                       <div style={{fontSize:13.5,fontWeight: done ? 700 : 600,color: done ? "#1B7C5E" : "var(--halo-text)",lineHeight:1.3}}>
                         {step.label}
                       </div>
                       <div style={{fontSize:11.5,color:"var(--halo-text-3)",marginTop:2,lineHeight:1.5}}>
                         {step.desc}
                       </div>
+                      {done && (
+                        <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:5,background:"#F2FBF7",border:"1px solid #B8EDD8",borderRadius:6,padding:"3px 8px"}}>
+                          <Icon name="check" size={10} color="#22C28F" stroke={2.5} />
+                          <span style={{fontSize:11,color:"#1B7C5E",fontWeight:600}}>
+                            Approved by <strong>{stepData.by}</strong> · {stepData.time}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -266,18 +297,42 @@ const Review = ({ companyId, embedded }) => {
             </div>
 
             {/* Progress bar */}
-            <div style={{margin:"20px 0 24px"}}>
+            <div style={{margin:"18px 0 16px"}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--halo-text-3)",marginBottom:6}}>
-                <span>{Object.values(checkedSteps).filter(Boolean).length} of 5 steps completed</span>
+                <span>{Object.keys(checkedSteps).length} of 5 steps completed</span>
                 {allChecked && <span style={{color:"#1B7C5E",fontWeight:700}}>✓ Ready to approve</span>}
               </div>
               <div style={{height:5,borderRadius:99,background:"#ECEEF6",overflow:"hidden"}}>
                 <div style={{
                   height:"100%",borderRadius:99,background:"var(--halo-mint)",
-                  width:(Object.values(checkedSteps).filter(Boolean).length/5*100)+"%",
+                  width:(Object.keys(checkedSteps).length/5*100)+"%",
                   transition:"width 300ms",
                 }} />
               </div>
+            </div>
+
+            {/* Comment field */}
+            <div style={{borderTop:"1px solid #ECEEF6",paddingTop:14,marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:"var(--halo-text)",marginBottom:6}}>
+                Approval Comment
+                <span style={{fontWeight:400,color:"var(--halo-text-3)",marginLeft:4}}>(optional)</span>
+              </div>
+              <textarea
+                value={approvalComment}
+                onChange={e => setApprovalComment(e.target.value)}
+                placeholder="Add notes for this approval — e.g. exceptions noted, next review date, IC memo reference..."
+                rows={3}
+                style={{
+                  width:"100%",resize:"vertical",boxSizing:"border-box",
+                  border:"1.5px solid #E6E7F4",borderRadius:8,
+                  padding:"9px 12px",fontSize:12.5,lineHeight:1.55,
+                  color:"var(--halo-text)",fontFamily:"Figtree, sans-serif",
+                  outline:"none",background:allChecked ? "white" : "#FAFBFD",
+                  transition:"border-color 180ms",
+                }}
+                onFocus={e => e.target.style.borderColor="#22C28F"}
+                onBlur={e => e.target.style.borderColor="#E6E7F4"}
+              />
             </div>
 
             {/* Actions */}
@@ -297,6 +352,97 @@ const Review = ({ companyId, embedded }) => {
                 <Icon name="check" size={13} color={allChecked ? "white" : "#8B91AB"} />
                 Confirm Approval
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Approval Record modal (read-only) ── */}
+      {showApprovalRecord && approvalRecord && (
+        <div style={{
+          position:"fixed",inset:0,background:"rgba(11,26,63,0.55)",zIndex:100,
+          display:"flex",alignItems:"center",justifyContent:"center",
+        }} onClick={() => setShowApprovalRecord(false)}>
+          <div style={{
+            background:"white",borderRadius:16,padding:"32px 36px",width:500,maxWidth:"92vw",
+            boxShadow:"0 24px 64px rgba(11,26,63,0.22)",maxHeight:"90vh",overflowY:"auto",
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:24}}>
+              <div>
+                <div style={{fontSize:11,letterSpacing:"0.16em",textTransform:"uppercase",color:"var(--halo-text-3)",fontWeight:700,marginBottom:6}}>
+                  Approval Record
+                </div>
+                <div style={{fontSize:20,fontWeight:800,color:"var(--halo-navy)",letterSpacing:"-0.01em"}}>
+                  {co.name}
+                </div>
+                <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:8,background:"#F2FBF7",border:"1.5px solid #22C28F",borderRadius:8,padding:"5px 12px"}}>
+                  <Icon name="check" size={12} color="#22C28F" stroke={2.5} />
+                  <span style={{fontSize:12,fontWeight:700,color:"#1B7C5E"}}>
+                    Assessment Approved by {approvalRecord.finalBy} · {approvalRecord.finalTime}
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setShowApprovalRecord(false)} style={{background:"none",border:"none",cursor:"pointer",padding:4,color:"var(--halo-text-3)"}}>
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+
+            {/* All 5 steps */}
+            <div style={{fontSize:11,letterSpacing:"0.14em",textTransform:"uppercase",fontWeight:700,color:"var(--halo-text-3)",marginBottom:12}}>
+              Verification steps
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:0,marginBottom:20}}>
+              {approvalRecord.steps.map((step, i) => (
+                <div key={step.id} style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+                  {/* Circle + line */}
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0}}>
+                    <div style={{
+                      width:32,height:32,borderRadius:"50%",
+                      background:"var(--halo-mint)",
+                      display:"grid",placeItems:"center",
+                      boxShadow:"0 0 0 3px rgba(34,194,143,0.15)",flexShrink:0,
+                    }}>
+                      <Icon name="check" size={13} color="white" stroke={2.5} />
+                    </div>
+                    {i < approvalRecord.steps.length - 1 && (
+                      <div style={{width:2,height:20,background:"#B8EDD8",borderRadius:1,margin:"3px 0"}} />
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div style={{paddingTop:5,paddingBottom:i < approvalRecord.steps.length-1 ? 8 : 0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"var(--halo-text)",lineHeight:1.3}}>
+                      {step.label}
+                    </div>
+                    <div style={{fontSize:11,color:"#1B7C5E",fontWeight:600,marginTop:3}}>
+                      Approved by <strong>{step.by}</strong> · {step.time}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Comment */}
+            {approvalRecord.comment ? (
+              <div style={{background:"#F7F8FC",border:"1.5px solid #E6E7F4",borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:11,letterSpacing:"0.14em",textTransform:"uppercase",fontWeight:700,color:"var(--halo-text-3)",marginBottom:6}}>
+                  Approval Comment
+                </div>
+                <div style={{fontSize:13,color:"var(--halo-text)",lineHeight:1.6}}>
+                  {approvalRecord.comment}
+                </div>
+                <div style={{fontSize:11,color:"var(--halo-text-3)",marginTop:8}}>
+                  — {approvalRecord.finalBy} · {approvalRecord.finalTime}
+                </div>
+              </div>
+            ) : (
+              <div style={{fontSize:12,color:"var(--halo-text-3)",fontStyle:"italic"}}>No comment added.</div>
+            )}
+
+            {/* Close */}
+            <div style={{marginTop:24,display:"flex",justifyContent:"flex-end"}}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowApprovalRecord(false)}>Close</button>
             </div>
           </div>
         </div>
