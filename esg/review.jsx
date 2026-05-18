@@ -62,6 +62,21 @@ const Review = ({ companyId, embedded }) => {
   });
   const [userFlags, setUserFlags] = React.useState({});
   const toggleFlag = (qid, currentFlag) => setUserFlags(prev => ({...prev, [qid]: !currentFlag}));
+
+  // ── Approval workflow ──
+  const APPROVAL_STEPS = [
+    { id: 'responses', label: 'Responses Reviewed',  desc: 'All founder answers have been read and verified by the ESG team.' },
+    { id: 'flags',     label: 'Flags Addressed',     desc: 'All flagged and concern questions have been noted or resolved.' },
+    { id: 'score',     label: 'Score Validated',     desc: 'ESG score has been computed and confirmed as accurate.' },
+    { id: 'qa',        label: 'Q&A Closed',           desc: 'All open founder questions have been answered.' },
+    { id: 'signoff',   label: 'Final Sign-off',       desc: 'ESG lead formally approves this assessment for the IC.' },
+  ];
+  const [showApproval, setShowApproval] = React.useState(false);
+  const [checkedSteps, setCheckedSteps] = React.useState({});
+  const [isApproved, setIsApproved] = React.useState(false);
+  const allChecked = APPROVAL_STEPS.every(s => checkedSteps[s.id]);
+  const toggleStep = (id) => setCheckedSteps(prev => ({...prev, [id]: !prev[id]}));
+  const confirmApproval = () => { setIsApproved(true); setShowApproval(false); };
   const addComment = (qid, sendToFounder) => {
     if (!draft.trim()) return;
     setComments({...comments, [qid]: [...(comments[qid] || []), { author: "Krishti Sharma", time: "Just now", text: draft.trim(), sentToFounder }]});
@@ -163,7 +178,126 @@ const Review = ({ companyId, embedded }) => {
             IN REVIEW
           </span>
           <div style={{marginLeft: "auto"}}>
-            <button className="btn btn-mint btn-sm"><Icon name="check" size={12} />Approve</button>
+            {isApproved ? (
+              <span style={{display:"inline-flex",alignItems:"center",gap:6,background:"#F2FBF7",border:"1.5px solid #22C28F",color:"#1B7C5E",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700}}>
+                <Icon name="check" size={13} color="#22C28F" />Assessment Approved
+              </span>
+            ) : (
+              <button
+                className="btn btn-sm"
+                onClick={() => setShowApproval(true)}
+                style={{
+                  background: allChecked ? "var(--halo-mint)" : "#E6E7F4",
+                  color: allChecked ? "white" : "#8B91AB",
+                  border: "none", cursor: "pointer",
+                  display:"inline-flex",alignItems:"center",gap:6,
+                  padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,
+                }}>
+                <Icon name="check" size={12} color={allChecked ? "white" : "#8B91AB"} />
+                Approve {allChecked ? "" : `(${Object.values(checkedSteps).filter(Boolean).length}/5)`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Approval workflow modal ── */}
+      {showApproval && (
+        <div style={{
+          position:"fixed",inset:0,background:"rgba(11,26,63,0.55)",zIndex:100,
+          display:"flex",alignItems:"center",justifyContent:"center",
+        }} onClick={() => setShowApproval(false)}>
+          <div style={{
+            background:"white",borderRadius:16,padding:"32px 36px",width:480,maxWidth:"90vw",
+            boxShadow:"0 24px 64px rgba(11,26,63,0.22)",
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{marginBottom:24}}>
+              <div style={{fontSize:11,letterSpacing:"0.16em",textTransform:"uppercase",color:"var(--halo-text-3)",fontWeight:700,marginBottom:6}}>
+                Approval Checklist
+              </div>
+              <div style={{fontSize:20,fontWeight:800,color:"var(--halo-navy)",letterSpacing:"-0.01em"}}>
+                Approve — {co.name}
+              </div>
+              <div style={{fontSize:12.5,color:"var(--halo-text-3)",marginTop:4}}>
+                Complete all 5 steps to enable final approval.
+              </div>
+            </div>
+
+            {/* Steps */}
+            <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              {APPROVAL_STEPS.map((step, i) => {
+                const done = !!checkedSteps[step.id];
+                return (
+                  <div key={step.id} style={{display:"flex",gap:16,alignItems:"flex-start",marginBottom:8}}>
+                    {/* Circle + connector */}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0}}>
+                      <button
+                        onClick={() => toggleStep(step.id)}
+                        style={{
+                          width:36,height:36,borderRadius:"50%",border:"none",cursor:"pointer",
+                          background: done ? "var(--halo-mint)" : "#F0F2F8",
+                          display:"grid",placeItems:"center",
+                          boxShadow: done ? "0 0 0 4px rgba(34,194,143,0.18)" : "none",
+                          transition:"all 180ms",flexShrink:0,
+                        }}>
+                        {done
+                          ? <Icon name="check" size={15} color="white" stroke={2.5} />
+                          : <span style={{fontSize:13,fontWeight:700,color:"#8B91AB"}}>{i+1}</span>
+                        }
+                      </button>
+                      {i < APPROVAL_STEPS.length - 1 && (
+                        <div style={{width:2,height:14,background: done ? "var(--halo-mint)" : "#E6E7F4",borderRadius:1,margin:"3px 0"}} />
+                      )}
+                    </div>
+                    {/* Text */}
+                    <div style={{paddingTop:6,paddingBottom:i < APPROVAL_STEPS.length-1 ? 14 : 0}}>
+                      <div style={{fontSize:13.5,fontWeight: done ? 700 : 600,color: done ? "#1B7C5E" : "var(--halo-text)",lineHeight:1.3}}>
+                        {step.label}
+                      </div>
+                      <div style={{fontSize:11.5,color:"var(--halo-text-3)",marginTop:2,lineHeight:1.5}}>
+                        {step.desc}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Progress bar */}
+            <div style={{margin:"20px 0 24px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--halo-text-3)",marginBottom:6}}>
+                <span>{Object.values(checkedSteps).filter(Boolean).length} of 5 steps completed</span>
+                {allChecked && <span style={{color:"#1B7C5E",fontWeight:700}}>✓ Ready to approve</span>}
+              </div>
+              <div style={{height:5,borderRadius:99,background:"#ECEEF6",overflow:"hidden"}}>
+                <div style={{
+                  height:"100%",borderRadius:99,background:"var(--halo-mint)",
+                  width:(Object.values(checkedSteps).filter(Boolean).length/5*100)+"%",
+                  transition:"width 300ms",
+                }} />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowApproval(false)}>Cancel</button>
+              <button
+                className="btn btn-sm"
+                disabled={!allChecked}
+                onClick={confirmApproval}
+                style={{
+                  background: allChecked ? "var(--halo-mint)" : "#E6E7F4",
+                  color: allChecked ? "white" : "#8B91AB",
+                  border:"none",cursor: allChecked ? "pointer" : "not-allowed",
+                  padding:"8px 20px",borderRadius:8,fontSize:13,fontWeight:700,
+                  display:"inline-flex",alignItems:"center",gap:6,
+                }}>
+                <Icon name="check" size={13} color={allChecked ? "white" : "#8B91AB"} />
+                Confirm Approval
+              </button>
+            </div>
           </div>
         </div>
       )}
