@@ -1,14 +1,69 @@
 // HALO ESG — Final Report
 
+// ── Pillar formula tooltip ──
+const PillarTip = ({ pillar, color, topics, sec }) => {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+  const rows = topics.filter(([k, t]) => (t.w[sec] || 0) > 0);
+  const maxPts = rows.reduce((s, [k, t]) => s + (t.w[sec] || 0), 0);
+  return (
+    <span ref={ref} style={{position:"relative",display:"inline-block",marginLeft:"auto"}}>
+      <button type="button" onClick={e => { e.stopPropagation(); setOpen(!open); }}
+        style={{width:20,height:20,borderRadius:"50%",background:open?color:"#E6E7F4",color:open?"white":"#45489B",fontSize:11,fontWeight:800,fontFamily:"Figtree,sans-serif",display:"inline-grid",placeItems:"center",border:"none",cursor:"pointer"}}>
+        i
+      </button>
+      {open && (
+        <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:268,background:"var(--halo-navy)",color:"white",borderRadius:10,padding:"14px 16px",boxShadow:"0 12px 32px rgba(15,33,80,0.3)",zIndex:40,textAlign:"left"}}>
+          <div style={{fontSize:9,letterSpacing:"0.16em",textTransform:"uppercase",color,fontWeight:800,marginBottom:6}}>
+            How {pillar} is scored
+          </div>
+          <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:10.5,color:"#ADB3CE",marginBottom:10,lineHeight:1.6,background:"rgba(255,255,255,0.06)",borderRadius:6,padding:"6px 8px"}}>
+            topic_weight × Σ(q_weight × response%)
+          </div>
+          {rows.map(([k, t]) => (
+            <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5,padding:"5px 0",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+              <span style={{color:"#C5C9DD"}}>{t.name}</span>
+              <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{t.w[sec]}pts</span>
+            </div>
+          ))}
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5,padding:"7px 0 0",marginTop:4,borderTop:"2px solid rgba(255,255,255,0.15)"}}>
+            <span style={{color,fontWeight:700}}>Max score</span>
+            <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{maxPts}pts</span>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+};
+
 const Report = ({ companyId, embedded }) => {
   const role = window.HALO_ROLE || 'esg';
   const co = window.HALO_ESG.COMPANIES.find(c => c.id === (companyId || "wer")) || window.HALO_ESG.COMPANIES[0];
 
-  // Hardcoded scores for assessment summary
-  const scores = { e: 26.2, s: 28.1, g: 24.1, total: 78.4, maxE: 35, maxS: 35, maxG: 30 };
-  const ePct = Math.round((scores.e / scores.maxE) * 100);
-  const sPct = Math.round((scores.s / scores.maxS) * 100);
-  const gPct = Math.round((scores.g / scores.maxG) * 100);
+  // Live scores from the scoring engine
+  const SCORING = window.HALO_ESG.SCORING;
+  const sec = SCORING.sectorKey(co.sector);
+  const computed = SCORING.computeScores(co.id);
+  const r1 = x => Math.round((x || 0) * 10) / 10;
+  const scores = computed
+    ? { e: r1(computed.eP.s), s: r1(computed.sP.s), g: r1(computed.gP.s), total: r1(computed.total),
+        maxE: r1(computed.eP.m), maxS: r1(computed.sP.m), maxG: r1(computed.gP.m) }
+    : { e: 26.2, s: 28.1, g: 24.1, total: 78.4, maxE: 25, maxS: 39, maxG: 36 };
+
+  // Topic lists per pillar (for formula tooltips)
+  const eTopics = Object.entries(SCORING.TOPICS).filter(([k, t]) => t.pillar === 'E' && (t.w[sec] || 0) > 0);
+  const sTopics = Object.entries(SCORING.TOPICS).filter(([k, t]) => t.pillar === 'S' && (t.w[sec] || 0) > 0);
+  const gTopics = Object.entries(SCORING.TOPICS).filter(([k, t]) => t.pillar === 'G' && (t.w[sec] || 0) > 0);
+
+  const ePct = scores.maxE > 0 ? Math.round((scores.e / scores.maxE) * 100) : 0;
+  const sPct = scores.maxS > 0 ? Math.round((scores.s / scores.maxS) * 100) : 0;
+  const gPct = scores.maxG > 0 ? Math.round((scores.g / scores.maxG) * 100) : 0;
   const pillars = [
     { name: "Environmental", pct: ePct },
     { name: "Social", pct: sPct },
@@ -17,18 +72,15 @@ const Report = ({ companyId, embedded }) => {
   const strongest = pillars.reduce((a, b) => a.pct >= b.pct ? a : b);
   const weakest = pillars.reduce((a, b) => a.pct <= b.pct ? a : b);
 
-  const assessmentSummary = `WeRize WFin scores ${scores.total}/100 overall, comfortably passing the Stride Ventures ESG threshold. ${strongest.name} is the strongest pillar at ${strongest.pct}% of its maximum, driven by above-sector diversity metrics and POSH compliance. ${weakest.name} is the primary improvement area at ${weakest.pct}%—focus on closing Scope 3 disclosure and supplier audit gaps to lift the score above 85.`;
+  const assessmentSummary = `${co.name} scores ${scores.total}/100 overall, comfortably passing the Stride Ventures ESG threshold. ${strongest.name} is the strongest pillar at ${strongest.pct}% of its maximum, driven by above-sector diversity metrics and POSH compliance. ${weakest.name} is the primary improvement area at ${weakest.pct}%—focus on closing Scope 3 disclosure and supplier audit gaps to lift the score above 85.`;
 
-  // Priority improvements — show items below 70% of max
+  // Priority improvements
   const improvements = [
     { text: "Disclose Scope 3 emissions by next quarter", pillarPct: ePct },
     { text: "Tighten gender pay gap (currently 4.8%, widening)", pillarPct: sPct },
     { text: "Expand supplier ESG audits beyond top-tier vendors", pillarPct: ePct },
     { text: "Publish board-level diversity tracking publicly", pillarPct: gPct },
   ];
-  // In this prototype all items are relevant (scores are hardcoded below threshold)
-  const belowThreshold = improvements.filter(item => item.pillarPct < 70);
-  // Show all 4 since prototype scores are below threshold; label shows count
   const improvementsToShow = improvements;
   const belowCount = improvementsToShow.length;
 
@@ -58,7 +110,7 @@ const Report = ({ companyId, embedded }) => {
             <div style={{display: "flex", alignItems: "center", gap: 14}}>
               <div>
                 <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>Score</div>
-                <div className="mono" style={{fontSize: 30, fontWeight: 700, color: "#1B7C5E", letterSpacing: "-0.02em", lineHeight: 1.1}}>78.4 <span style={{fontSize: 14, color: "var(--halo-text-3)", fontWeight: 500}}>/100</span></div>
+                <div className="mono" style={{fontSize: 30, fontWeight: 700, color: "#1B7C5E", letterSpacing: "-0.02em", lineHeight: 1.1}}>{scores.total} <span style={{fontSize: 14, color: "var(--halo-text-3)", fontWeight: 500}}>/100</span></div>
               </div>
             </div>
             <div style={{display: "flex", gap: 28, alignItems: "center"}}>
@@ -80,7 +132,38 @@ const Report = ({ companyId, embedded }) => {
           </div>
         </div>
 
-        {/* ── DEAL TEAM: pipeline stage tracker only ── */}
+        {/* ── E/S/G breakdown — deal + risk ── */}
+        {(role === 'deal' || role === 'risk') && (
+          <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 18}}>
+            {[
+              { label: "Environmental", icon: "leaf",   v: scores.e, m: scores.maxE, c: "#22C28F" },
+              { label: "Social",        icon: "brain",  v: scores.s, m: scores.maxS, c: "#6B6FBF" },
+              { label: "Governance",    icon: "shield", v: scores.g, m: scores.maxG, c: "#E8A33D" },
+            ].map(p => {
+              const pct = p.m > 0 ? Math.round(p.v / p.m * 100) : 0;
+              return (
+                <div key={p.label} className="card" style={{padding: "18px 20px", borderTop: `3px solid ${p.c}`}}>
+                  <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 12}}>
+                    <div style={{width: 28, height: 28, borderRadius: 7, background: p.c + "1A", display: "grid", placeItems: "center", flexShrink: 0}}>
+                      <Icon name={p.icon} size={14} color={p.c} />
+                    </div>
+                    <div style={{fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>{p.label}</div>
+                  </div>
+                  <div>
+                    <span className="mono" style={{fontSize: 24, fontWeight: 700, color: "var(--halo-text)"}}>{p.v}</span>
+                    <span className="mono" style={{fontSize: 13, color: "var(--halo-text-3)"}}> / {p.m}</span>
+                  </div>
+                  <div style={{marginTop: 10, height: 5, borderRadius: 99, background: "#ECEEF6", overflow: "hidden"}}>
+                    <div style={{height: "100%", width: pct + "%", background: p.c, borderRadius: 99}} />
+                  </div>
+                  <div style={{marginTop: 5, fontSize: 11, color: "var(--halo-text-3)"}}>{pct}% of maximum</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── DEAL TEAM: pipeline stage tracker ── */}
         {role === 'deal' && (() => {
           const PIPELINE = [
             { label: "Survey Sent",     done: !!(co.sent && co.sent !== "—"),                          date: co.sent },
@@ -91,7 +174,7 @@ const Report = ({ companyId, embedded }) => {
           ];
           const currentIdx = PIPELINE.reduce((acc, s, i) => s.done ? i : acc, -1);
           return (
-            <div className="card card-pad" style={{marginTop: 18, marginBottom: 40}}>
+            <div className="card card-pad" style={{marginBottom: 40}}>
               <div style={{fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 20}}>
                 Assessment Progress
               </div>
@@ -105,20 +188,10 @@ const Report = ({ companyId, embedded }) => {
                   const lineColor   = isDone ? "var(--halo-mint)" : "#ECEEF6";
                   return (
                     <div key={i} style={{flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative"}}>
-                      {/* Connector line */}
                       {i < PIPELINE.length - 1 && (
-                        <div style={{
-                          position: "absolute", top: 16, left: "50%", width: "100%",
-                          height: 2, background: lineColor, zIndex: 0,
-                        }} />
+                        <div style={{position: "absolute", top: 16, left: "50%", width: "100%", height: 2, background: lineColor, zIndex: 0}} />
                       )}
-                      {/* Circle */}
-                      <div style={{
-                        width: 32, height: 32, borderRadius: "50%",
-                        background: circleColor, border: "2px solid " + (isDone ? "var(--halo-mint)" : isPartial ? "#E8A33D" : isCurrent ? "#6B6FBF" : "#DDDFE8"),
-                        display: "grid", placeItems: "center", zIndex: 1,
-                        boxShadow: isDone ? "0 0 0 4px rgba(34,194,143,0.15)" : isCurrent ? "0 0 0 4px rgba(107,111,191,0.15)" : "none",
-                      }}>
+                      <div style={{width: 32, height: 32, borderRadius: "50%", background: circleColor, border: "2px solid " + (isDone ? "var(--halo-mint)" : isPartial ? "#E8A33D" : isCurrent ? "#6B6FBF" : "#DDDFE8"), display: "grid", placeItems: "center", zIndex: 1, boxShadow: isDone ? "0 0 0 4px rgba(34,194,143,0.15)" : isCurrent ? "0 0 0 4px rgba(107,111,191,0.15)" : "none"}}>
                         {isDone
                           ? <Icon name="check" size={14} color="white" stroke={2.5} />
                           : isPartial
@@ -126,11 +199,8 @@ const Report = ({ companyId, embedded }) => {
                           : <span style={{fontSize: 11, fontWeight: 700, color: isCurrent ? "#45489B" : "#A0A4B8"}}>{i + 1}</span>
                         }
                       </div>
-                      {/* Label + date */}
                       <div style={{marginTop: 10, textAlign: "center", paddingLeft: 4, paddingRight: 4}}>
-                        <div style={{fontSize: 11.5, fontWeight: isDone || isCurrent ? 700 : 500, color: textColor, lineHeight: 1.3}}>
-                          {stage.label}
-                        </div>
+                        <div style={{fontSize: 11.5, fontWeight: isDone || isCurrent ? 700 : 500, color: textColor, lineHeight: 1.3}}>{stage.label}</div>
                         {stage.date && stage.date !== "—" && (
                           <div style={{fontSize: 10, color: "var(--halo-text-3)", marginTop: 3}}>{stage.date}</div>
                         )}
@@ -138,16 +208,6 @@ const Report = ({ companyId, embedded }) => {
                     </div>
                   );
                 })}
-              </div>
-              {/* Send survey CTA */}
-              <div style={{marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--halo-line-2)", display: "flex", alignItems: "center", justifyContent: "space-between"}}>
-                <div>
-                  <div style={{fontSize: 13, fontWeight: 600}}>Need to send or resend the survey?</div>
-                  <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 2}}>The ESG team will be notified once the form is submitted.</div>
-                </div>
-                <button className="btn btn-mint btn-sm" onClick={() => window.HALO_NAV("send")}>
-                  <Icon name="send" size={12} />Send Survey
-                </button>
               </div>
             </div>
           );
@@ -175,16 +235,31 @@ const Report = ({ companyId, embedded }) => {
           {/* Pillar tiles */}
           <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, margin: "22px 0"}}>
             {[
-              { p: "Environment", v: 26.2, m: 35, c: "#22C28F", note: "Strong renewable mix; Scope 3 disclosure pending" },
-              { p: "Social",      v: 28.1, m: 35, c: "#6B6FBF", note: "Above-sector diversity; POSH compliant" },
-              { p: "Governance",  v: 24.1, m: 30, c: "#E8A33D", note: "Independent directors present; whistleblower active" },
+              { p: "Environment", icon: "leaf",   v: scores.e, m: scores.maxE, c: "#22C28F", topics: eTopics, note: "Strong renewable mix; Scope 3 disclosure pending" },
+              { p: "Social",      icon: "brain",  v: scores.s, m: scores.maxS, c: "#6B6FBF", topics: sTopics, note: "Above-sector diversity; POSH compliant" },
+              { p: "Governance",  icon: "shield", v: scores.g, m: scores.maxG, c: "#E8A33D", topics: gTopics, note: "Independent directors present; whistleblower active" },
             ].map(p => (
-              <div key={p.p} className="pillar-tile">
-                <Ring value={p.v} max={p.m} color={p.c} size={84} stroke={11} track="#EEF0F6" />
-                <div>
-                  <div className="label">{p.p}</div>
-                  <div><span className="v mono">{p.v}</span><span className="max"> / {p.m}</span></div>
-                  <div style={{fontSize: 11, color: "var(--halo-text-3)", marginTop: 4, lineHeight: 1.45}}>{p.note}</div>
+              <div key={p.p} className="card" style={{padding: "22px 24px", borderTop: `3px solid ${p.c}`}}>
+                {/* Icon + label + formula tip */}
+                <div style={{display: "flex", alignItems: "center", gap: 10, marginBottom: 16}}>
+                  <div style={{width: 32, height: 32, borderRadius: 8, background: p.c + "1A", display: "grid", placeItems: "center", flexShrink: 0}}>
+                    <Icon name={p.icon} size={15} color={p.c} />
+                  </div>
+                  <div style={{fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, flex: 1}}>
+                    {p.p}
+                  </div>
+                  <PillarTip pillar={p.p} color={p.c} topics={p.topics} sec={sec} />
+                </div>
+                {/* Ring + score */}
+                <div style={{display: "flex", alignItems: "center", gap: 16}}>
+                  <Ring value={p.v} max={p.m} color={p.c} size={72} stroke={9} track="#EEF0F6" />
+                  <div>
+                    <div>
+                      <span className="mono" style={{fontSize: 28, fontWeight: 700, color: "var(--halo-text)"}}>{p.v}</span>
+                      <span className="mono" style={{fontSize: 13, color: "var(--halo-text-3)"}}> / {p.m}</span>
+                    </div>
+                    <div style={{fontSize: 11, color: "var(--halo-text-3)", marginTop: 6, lineHeight: 1.45}}>{p.note}</div>
+                  </div>
                 </div>
               </div>
             ))}

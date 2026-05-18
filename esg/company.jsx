@@ -4,12 +4,26 @@ const CompanyDetail = ({ companyId }) => {
   const co = window.HALO_ESG.COMPANIES.find(c => c.id === companyId) || window.HALO_ESG.COMPANIES[0];
   const filled  = co.progress === 100;
   const scored  = co.score !== null;
+  const role    = window.HALO_ROLE || 'esg';
 
+  // Deal / Risk always land on Report; ESG picks best available tab
   const [tab, setTab] = React.useState(() => {
+    if (role !== 'esg')            return "report";
     if (co.score !== null)         return "report";
     if (co.progress === 100)       return "review";
     return "submission";
   });
+
+  // ESG sees all tabs; deal / risk see only Report
+  const tabList = role === 'esg'
+    ? [
+        { id: "report",     label: "Report",             icon: "folder", disabled: !scored },
+        { id: "review",     label: "Review",             icon: "brain",  disabled: !filled },
+        { id: "submission", label: "Submitted Response", icon: "folder" },
+      ]
+    : [
+        { id: "report", label: "Report", icon: "folder", disabled: !scored },
+      ];
 
   return (
     <div className="fade-in">
@@ -42,7 +56,6 @@ const CompanyDetail = ({ companyId }) => {
               </div>
             </div>
           </div>
-          <StageBadge co={co} filled={filled} scored={scored} />
         </div>
       </div>
 
@@ -57,11 +70,7 @@ const CompanyDetail = ({ companyId }) => {
         top: 0,
         zIndex: 10,
       }}>
-        {[
-          { id: "report",     label: "Report",             icon: "folder", disabled: !scored },
-          { id: "review",     label: "Review",             icon: "brain", disabled: !filled },
-          { id: "submission", label: "Submitted Response", icon: "folder" },
-        ].map(t => {
+        {tabList.map(t => {
           const active = tab === t.id;
           return (
             <button key={t.id}
