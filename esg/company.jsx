@@ -14,7 +14,7 @@ const CompanyDetail = ({ companyId }) => {
     return "submission";
   });
 
-  // ESG sees all tabs; deal / risk see only Report
+  // ESG sees all tabs; deal / risk see only Report (always enabled — handles unscored state inline)
   const tabList = role === 'esg'
     ? [
         { id: "report",     label: "Report",             icon: "folder", disabled: !scored },
@@ -22,7 +22,7 @@ const CompanyDetail = ({ companyId }) => {
         { id: "submission", label: "Submitted Response", icon: "folder" },
       ]
     : [
-        { id: "report", label: "Report", icon: "folder", disabled: !scored },
+        { id: "report", label: "Report", icon: "folder", disabled: false },
       ];
 
   return (
@@ -96,7 +96,7 @@ const CompanyDetail = ({ companyId }) => {
 
       {tab === "submission" && <Submission co={co} />}
       {tab === "review" && filled && <Review companyId={co.id} embedded />}
-      {tab === "report" && scored && <Report companyId={co.id} embedded />}
+      {tab === "report" && (scored || role !== 'esg') && <Report companyId={co.id} embedded />}
     </div>
   );
 };

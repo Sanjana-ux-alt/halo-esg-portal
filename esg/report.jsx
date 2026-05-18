@@ -224,6 +224,22 @@ const Report = ({ companyId, embedded }) => {
   const improvementsToShow = improvements;
   const belowCount = improvementsToShow.length;
 
+  // ── State of the company's assessment (for the hero card + sub-bar) ──
+  const hasScore   = co.score !== null;
+  const submitted  = co.submitted && co.submitted !== "—" ? co.submitted : null;
+  const reviewed   = co.reviewed && co.reviewed !== "—" ? co.reviewed : null;
+  const sent       = co.sent && co.sent !== "—" ? co.sent : null;
+  // Pick the right status pill content based on stage
+  const stage = co.status === 'completed' && reviewed
+    ? { label: 'Approved',     bg: '#DCF5EB',  fg: '#1B7C5E', icon: 'check' }
+    : hasScore
+    ? { label: 'Under Review', bg: '#E6E7F4',  fg: '#45489B', icon: 'clock' }
+    : submitted
+    ? { label: 'Submitted',    bg: '#E6E7F4',  fg: '#45489B', icon: 'check' }
+    : co.progress > 0
+    ? { label: `In Progress · ${co.progress}%`, bg: '#FBF1DE', fg: '#8E5F18', icon: 'clock' }
+    : { label: 'Awaiting Response', bg: '#FBF1DE', fg: '#8E5F18', icon: 'clock' };
+
   return (
     <div className="fade-in">
       {!embedded && <HeaderBand
@@ -234,49 +250,89 @@ const Report = ({ companyId, embedded }) => {
       {embedded && (
         <div style={{padding: "16px 36px 0", display: "flex", alignItems: "center", gap: 12}}>
           <div style={{fontSize: 13, color: "var(--halo-text-2)"}}>
-            Report <span className="mono" style={{color: "var(--halo-text)", fontWeight: 600}}>ESG-2026-0428-{co.id.toUpperCase()}</span> · Approved May 2, 2026
+            {hasScore
+              ? <>Report <span className="mono" style={{color: "var(--halo-text)", fontWeight: 600}}>ESG-2026-0428-{co.id.toUpperCase()}</span>{reviewed ? ` · Approved ${reviewed}` : ' · Under Review'}</>
+              : <>Survey <span className="mono" style={{color: "var(--halo-text)", fontWeight: 600}}>ESG-2026-{co.id.toUpperCase()}</span>{sent ? ` · Sent ${sent}` : ''}</>
+            }
           </div>
-          <span className="chip-status mint" style={{fontSize: 10, marginLeft: 4}}>APPROVED</span>
-          <div style={{marginLeft: "auto"}}>
-            <button className="btn btn-outline btn-sm"><Icon name="download" size={12} />Download PDF</button>
-          </div>
+          <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:999,fontSize:10,fontWeight:800,letterSpacing:"0.12em",background: stage.bg, color: stage.fg, marginLeft: 4}}>
+            <Icon name={stage.icon} size={10} color={stage.fg} stroke={2.5} />{stage.label.toUpperCase()}
+          </span>
+          {hasScore && (
+            <div style={{marginLeft: "auto"}}>
+              <button className="btn btn-outline btn-sm"><Icon name="download" size={12} />Download PDF</button>
+            </div>
+          )}
         </div>
       )}
 
       <div className="content" style={{maxWidth: 1100}}>
-        {/* Hero — compact (always visible) */}
-        <div className="card" style={{padding: "20px 24px", borderTop: "3px solid var(--halo-mint)", marginBottom: 18}}>
+        {/* Hero — compact (always visible, adapts to assessment stage) */}
+        <div className="card" style={{padding: "20px 24px", borderTop: `3px solid ${hasScore ? 'var(--halo-mint)' : '#E8A33D'}`, marginBottom: 18}}>
           <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24}}>
             <div style={{display: "flex", alignItems: "center", gap: 14}}>
               <div>
                 <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, display: "flex", alignItems: "center"}}>
                   Score
-                  <FormulaTip kind="total" sec={sec} scores={scores} tier={tier} threshold={threshold} anchor="left" />
+                  {hasScore && <FormulaTip kind="total" sec={sec} scores={scores} tier={tier} threshold={threshold} anchor="left" />}
                 </div>
-                <div className="mono" style={{fontSize: 30, fontWeight: 700, color: "#1B7C5E", letterSpacing: "-0.02em", lineHeight: 1.1}}>{scores.total} <span style={{fontSize: 14, color: "var(--halo-text-3)", fontWeight: 500}}>/100</span></div>
+                {hasScore ? (
+                  <div className="mono" style={{fontSize: 30, fontWeight: 700, color: "#1B7C5E", letterSpacing: "-0.02em", lineHeight: 1.1}}>{scores.total} <span style={{fontSize: 14, color: "var(--halo-text-3)", fontWeight: 500}}>/100</span></div>
+                ) : (
+                  <div style={{fontSize: 18, fontWeight: 700, color: "var(--halo-text-3)", letterSpacing: "-0.01em", lineHeight: 1.2, marginTop: 4}}>
+                    Pending <span style={{fontSize: 12, fontWeight: 500}}>· available after submission</span>
+                  </div>
+                )}
               </div>
             </div>
-            <div style={{display: "flex", gap: 28, alignItems: "center"}}>
+            <div style={{display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap"}}>
               <div>
                 <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>Status</div>
-                <div style={{display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4, padding: "4px 12px", borderRadius: 999, background: "#DCF5EB", color: "#1B7C5E", fontSize: 13, fontWeight: 700}}>
-                  <Icon name="check" size={13} stroke={2.5} />Passed
+                <div style={{display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4, padding: "4px 12px", borderRadius: 999, background: stage.bg, color: stage.fg, fontSize: 13, fontWeight: 700}}>
+                  <Icon name={stage.icon} size={13} stroke={2.5} />{stage.label}
                 </div>
               </div>
+              {sent && (
+                <div>
+                  <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>Sent</div>
+                  <div style={{fontSize: 14, fontWeight: 700}}>{sent}</div>
+                </div>
+              )}
               <div>
                 <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>Submitted</div>
-                <div style={{fontSize: 14, fontWeight: 700}}>Apr 22, 2026</div>
+                <div style={{fontSize: 14, fontWeight: 700, color: submitted ? 'var(--halo-text)' : 'var(--halo-text-3)'}}>{submitted || '—'}</div>
               </div>
               <div>
                 <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700}}>Reviewed</div>
-                <div style={{fontSize: 14, fontWeight: 700}}>Apr 29, 2026</div>
+                <div style={{fontSize: 14, fontWeight: 700, color: reviewed ? 'var(--halo-text)' : 'var(--halo-text-3)'}}>{reviewed || '—'}</div>
               </div>
             </div>
           </div>
+          {!hasScore && (
+            <div style={{marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--halo-line-2)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16}}>
+              <div style={{fontSize: 12.5, color: "var(--halo-text-2)", lineHeight: 1.5}}>
+                {co.progress > 0 && co.progress < 100
+                  ? <><strong style={{color: "var(--halo-text)"}}>{co.spoc}</strong> is currently filling the survey — <strong>{co.progress}%</strong> complete. The score and ESG report will appear once submitted and reviewed.</>
+                  : co.progress === 0
+                  ? <>Survey was sent to <strong style={{color: "var(--halo-text)"}}>{co.spoc}</strong>. No progress yet — a reminder may help.</>
+                  : <>Form was submitted. Awaiting ESG review and scoring.</>
+                }
+              </div>
+              <div style={{flexShrink: 0, width: 180}}>
+                <div style={{display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--halo-text-3)", marginBottom: 5}}>
+                  <span>Form progress</span>
+                  <span className="mono" style={{fontWeight: 700, color: "var(--halo-text)"}}>{co.progress}%</span>
+                </div>
+                <div style={{height: 6, borderRadius: 99, background: "#ECEEF6", overflow: "hidden"}}>
+                  <div style={{height: "100%", width: co.progress + "%", background: co.progress === 100 ? "var(--halo-mint)" : "#E8A33D", borderRadius: 99}} />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ── E/S/G breakdown — deal + risk ── */}
-        {(role === 'deal' || role === 'risk') && (
+        {/* ── E/S/G breakdown — deal + risk, only once scored ── */}
+        {(role === 'deal' || role === 'risk') && hasScore && (
           <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 18}}>
             {[
               { label: "Environmental", icon: "leaf",   v: scores.e, m: scores.maxE, c: "#22C28F" },
