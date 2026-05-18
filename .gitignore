@@ -16,3 +16,5 @@ HALO ESG*.html
 
 # Node
 node_modules/
+.vercel
+.env*.local
