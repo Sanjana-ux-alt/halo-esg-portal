@@ -41,20 +41,10 @@ const Sidebar = ({ active, role, userName }) => {
     <a className="nav-item" href="#"><Icon name="chart" />Analytics</a>
 
     <div className="nav-group">ESG Module</div>
-    <a className={"nav-item active"} href="#" onClick={(e)=>e.preventDefault()}>
+    <a className={"nav-item active"} href="#" onClick={(e)=>{e.preventDefault();window.HALO_NAV("overview");}}>
       <Icon name="leaf" />ESG Portal
       <span className="nav-tag">LIVE</span>
     </a>
-    {perms.canSend && (
-      <a className="nav-item" href="#" onClick={(e)=>{e.preventDefault();window.HALO_NAV("send");}}>
-        <Icon name="send" />Send Survey
-      </a>
-    )}
-    {perms.canEditForm && (
-      <a className="nav-item" href="#" onClick={(e)=>{e.preventDefault();window.HALO_NAV("form-builder");}}>
-        <Icon name="pen" />Form Builder
-      </a>
-    )}
 
     <div className="nav-group">Account</div>
     <a className="nav-item" href="#"><Icon name="shield" />Settings</a>

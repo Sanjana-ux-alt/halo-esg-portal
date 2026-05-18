@@ -2,7 +2,7 @@
 // Lets ESG add / remove / toggle questions from the master survey.
 // All companies' assessments read from SCORING.getActiveQuestions().
 
-const FormBuilder = () => {
+const FormBuilder = ({ embedded }) => {
   const SCORING = window.HALO_ESG.SCORING;
   const STATE   = window.HALO_ESG.STATE;
   const [tick, setTick] = React.useState(0);
@@ -64,14 +64,16 @@ const FormBuilder = () => {
   const totalDisabled = disabled.size;
 
   return (
-    <div className="fade-in">
-      <HeaderBand
-        title="Form Builder"
-        subtitle={`Master ESG questionnaire · ${baseQs.length} Excel KPIs · curate which questions every founder sees`}
-        badge="ESG"
-      />
+    <div className={embedded ? "" : "fade-in"}>
+      {!embedded && (
+        <HeaderBand
+          title="Form Builder"
+          subtitle={`Master ESG questionnaire · ${baseQs.length} Excel KPIs · curate which questions every founder sees`}
+          badge="ESG"
+        />
+      )}
 
-      <div className="content" style={{maxWidth: 1100}}>
+      <div className={embedded ? "" : "content"} style={embedded ? {} : {maxWidth: 1100}}>
 
         {/* Summary stats */}
         <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 22}}>

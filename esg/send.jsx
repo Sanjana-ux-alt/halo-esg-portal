@@ -77,8 +77,8 @@ const SendSurvey = () => {
   };
   const removeQ = id => setQuestions(questions.filter(q => q.id !== id));
 
-  const STEPS = ["Pick company", "Configure delivery", "Send"];
-  const stepIdx = ["pick", "configure", "confirm"].indexOf(step);
+  const STEPS = ["Pick company", "Review form", "Configure delivery", "Send"];
+  const stepIdx = ["pick", "review-form", "configure", "confirm"].indexOf(step);
 
   return (
     <div style={{padding: "24px 36px"}}>
@@ -154,7 +154,32 @@ const SendSurvey = () => {
           <div style={{padding: "16px 24px", borderTop: "1px solid var(--halo-line)", display: "flex", justifyContent: "flex-end", gap: 10}}>
             <button className="btn btn-mint" disabled={!selected}
               style={!selected ? {opacity: 0.5, cursor: "not-allowed"} : {}}
-              onClick={() => selected && setStep("configure")}>Continue<Icon name="chev" size={13} /></button>
+              onClick={() => selected && setStep("review-form")}>Continue<Icon name="chev" size={13} /></button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Review form (Form Builder embedded) */}
+      {step === "review-form" && co && (
+        <div>
+          <div className="card" style={{padding: "16px 22px", marginBottom: 18, display: "flex", alignItems: "center", gap: 14}}>
+            <div className="co-logo" style={{background: co.color, width: 40, height: 40, borderRadius: 10, fontSize: 13}}>{co.initials}</div>
+            <div style={{flex: 1}}>
+              <div style={{fontSize: 14, fontWeight: 700}}>Review the form for {co.name}</div>
+              <div style={{fontSize: 12, color: "var(--halo-text-3)", marginTop: 2, lineHeight: 1.5}}>
+                Sector: <strong>{co.sector}</strong>. Browse the active questions {co.spoc.split(' ')[0]} will see. Switch to Edit mode if you need to add or remove questions before sending.
+              </div>
+            </div>
+          </div>
+
+          {/* The Form Builder itself (defaults to View; Edit requires confirmation) */}
+          <FormBuilder embedded />
+
+          <div style={{display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18}}>
+            <button className="btn btn-ghost" onClick={() => setStep("pick")}><Icon name="arrowback" size={13} />Back</button>
+            <button className="btn btn-mint" onClick={() => setStep("configure")}>
+              Continue to delivery<Icon name="chev" size={13} />
+            </button>
           </div>
         </div>
       )}
@@ -456,7 +481,7 @@ const SendSurvey = () => {
               )}
 
               <div style={{display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end"}}>
-                <button className="btn btn-ghost" onClick={() => setStep("pick")}><Icon name="arrowback" size={13} />Back</button>
+                <button className="btn btn-ghost" onClick={() => setStep("review-form")}><Icon name="arrowback" size={13} />Back</button>
                 <button className="btn btn-mint"
                   disabled={recipients.length === 0 || !tier}
                   style={(recipients.length === 0 || !tier) ? {opacity:0.5, cursor:"not-allowed"} : {}}
