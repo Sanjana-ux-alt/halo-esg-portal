@@ -6,7 +6,7 @@
 //   response% → q_weight × response% → topic_weight × Σ → Σ topics → pillar/total
 // ───────────────────────────────────────────────────────────────────────────
 
-const FormulaTip = ({ kind, color, sec, scores, tier, threshold, anchor = "right" }) => {
+const FormulaTip = ({ kind, color, sec, scores, tier, threshold, computed, anchor = "right" }) => {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   React.useEffect(() => {
@@ -17,95 +17,60 @@ const FormulaTip = ({ kind, color, sec, scores, tier, threshold, anchor = "right
   }, [open]);
 
   const SCORING = window.HALO_ESG.SCORING;
-  const TOPICS  = SCORING.TOPICS;
-  const ACTIVE  = SCORING.getActiveQuestions();
+  const r2 = (x) => Math.round((x || 0) * 100) / 100;
+  const r3 = (x) => Math.round((x || 0) * 1000) / 1000;
 
-  // ── Helpers ──
-  const topicsForPillar = (p) =>
-    Object.entries(TOPICS)
-      .filter(([k, t]) => t.pillar === p && (t.w[sec] || 0) > 0)
-      .map(([tk, t]) => {
-        const qs = ACTIVE.filter(q => q.topic === tk && !q.unscored && (!q.sectors || q.sectors.includes(sec)));
-        return { tk, name: t.name, weight: t.w[sec], count: qs.length };
-      });
+  // Topic rows actually evaluated by computeScores for THIS company, filtered by pillar.
+  const topicsByPillar = (p) => (computed?.byTopic || []).filter(t => t.pillar === p);
 
-  // ── Content per kind ──
-  let title = "How it's scored";
-  let formulaLines = [];
-  let topicRows = [];
-  let footer = null;
+  // Format response % for display (skip percent sign if already 0..100)
+  const fmtPct = (x) => `${Math.round((x || 0) * 100)}%`;
 
-  if (kind === 'total') {
-    title = "How the total ESG score is calculated";
-    formulaLines = [
-      "Total = E + S + G",
-      "",
-      "Each pillar = Σ topic scores",
-      "Each topic  = topic_weight × Σ(q_weight × response%)",
-      "response%   ∈ {0, 25, 50, 75, 100}  (Excel bracket)",
-    ];
-    topicRows = [
-      { label: "Environment", v: scores.e, m: scores.maxE, c: "#22C28F" },
-      { label: "Social",      v: scores.s, m: scores.maxS, c: "#6B6FBF" },
-      { label: "Governance",  v: scores.g, m: scores.maxG, c: "#E8A33D" },
-    ];
-    const verdict = scores.total >= threshold ? 'PASS' : (scores.total >= threshold * 0.6 ? 'REVIEW' : 'FAIL');
-    const verdictColor = verdict === 'PASS' ? '#22C28F' : verdict === 'REVIEW' ? '#E8A33D' : '#E25C5C';
-    footer = (
-      <>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5,padding:"8px 0 6px",marginTop:6,borderTop:"2px solid rgba(255,255,255,0.18)"}}>
-          <span style={{color:"#ADB3CE",fontWeight:700}}>Total</span>
-          <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{scores.total} / 100</span>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
-          <span style={{color:"#ADB3CE"}}>Tier {tier} · Pass ≥</span>
-          <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{threshold} / 100</span>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
-          <span style={{color:"#ADB3CE"}}>Verdict</span>
-          <span style={{padding:"2px 9px",borderRadius:4,background:verdictColor+"33",color:verdictColor,fontWeight:800,letterSpacing:"0.1em"}}>{verdict}</span>
-        </div>
-      </>
-    );
+  // Shorten a question label for the popover row
+  const shortQ = (q) => {
+    const text = q.q || '';
+    return text.length > 36 ? text.slice(0, 34).trim() + '…' : text;
+  };
+
+  const isTotal = kind === 'total';
+  const pillarName = kind === 'E' ? 'Environment' : kind === 'S' ? 'Social' : kind === 'G' ? 'Governance' : null;
+
+  // ── Title with the actual numbers ──
+  let title;
+  if (isTotal) {
+    title = `How ${scores.total} / 100 was calculated`;
   } else {
-    // pillar kind: 'E' | 'S' | 'G'
-    const pillarName = kind === 'E' ? 'Environment' : kind === 'S' ? 'Social' : 'Governance';
-    title = `How ${pillarName} is scored`;
-    formulaLines = [
-      "Step 1  response% = Excel bracket lookup",
-      "        e.g. % women → 0% / 50% / 75% / 100%",
-      "",
-      "Step 2  q_score = q_weight × response%",
-      "",
-      "Step 3  topic_score = topic_weight × Σ q_score",
-      "        topic_weight = sector column in Excel",
-      "",
-      "Step 4  pillar_score = Σ topic_score",
-    ];
-    topicRows = topicsForPillar(kind);
-    const maxTotal = topicRows.reduce((s, r) => s + r.weight, 0);
-    const qTotal   = topicRows.reduce((s, r) => s + r.count, 0);
-    footer = (
-      <div style={{display:"flex",justifyContent:"space-between",fontSize:11.5,padding:"8px 0 0",marginTop:6,borderTop:"2px solid rgba(255,255,255,0.18)"}}>
-        <span style={{color,fontWeight:700}}>Max {pillarName}</span>
-        <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{maxTotal}pts · {qTotal}Q</span>
-      </div>
-    );
+    const pv = kind === 'E' ? scores.e : kind === 'S' ? scores.s : scores.g;
+    const pm = kind === 'E' ? scores.maxE : kind === 'S' ? scores.maxS : scores.maxG;
+    title = `How ${pillarName} reached ${pv} / ${pm}`;
   }
+
+  // ── Formula reminder (compact) ──
+  const formulaLines = isTotal
+    ? [
+        "Total = E + S + G",
+        "Each pillar = Σ topic scores",
+        "Each topic  = topic_weight × Σ(q_weight × response%)",
+        "response%   from Excel bracket lookup",
+      ]
+    : [
+        "topic_score  = topic_w × Σ(q_w × response%)",
+        "pillar_score = Σ topic_score",
+        "response%    ∈ {0, 25, 50, 75, 100}",
+      ];
 
   const anchorStyle = anchor === "right" ? {right: 0} : {left: 0};
 
   return (
-    <span ref={ref} style={{position:"relative",display:"inline-block",marginLeft: kind === 'total' ? 6 : "auto"}}>
+    <span ref={ref} style={{position:"relative",display:"inline-block",marginLeft: isTotal ? 6 : "auto"}}>
       <button type="button" onClick={e => { e.stopPropagation(); setOpen(!open); }}
         title="How is this score computed?"
         style={{
-          width: kind === 'total' ? 18 : 20,
-          height: kind === 'total' ? 18 : 20,
+          width: isTotal ? 18 : 20, height: isTotal ? 18 : 20,
           borderRadius:"50%",
           background: open ? (color || "var(--halo-navy)") : "#E6E7F4",
           color: open ? "white" : "#45489B",
-          fontSize: kind === 'total' ? 10 : 11,
+          fontSize: isTotal ? 10 : 11,
           fontWeight:800, fontFamily:"Figtree,sans-serif",
           display:"inline-grid", placeItems:"center",
           border:"none", cursor:"pointer", verticalAlign: "middle",
@@ -115,12 +80,13 @@ const FormulaTip = ({ kind, color, sec, scores, tier, threshold, anchor = "right
       {open && (
         <div style={{
           position:"absolute", top:"calc(100% + 8px)", ...anchorStyle,
-          width: 360, background:"var(--halo-navy)", color:"white",
+          width: 440, maxHeight: 560, overflowY: "auto",
+          background:"var(--halo-navy)", color:"white",
           borderRadius:12, padding:"16px 18px",
           boxShadow:"0 16px 40px rgba(15,33,80,0.35)", zIndex:40, textAlign:"left",
         }}>
           {/* Header */}
-          <div style={{fontSize:9.5,letterSpacing:"0.16em",textTransform:"uppercase",color: color || "var(--halo-mint)",fontWeight:800,marginBottom:8}}>
+          <div style={{fontSize:10,letterSpacing:"0.16em",textTransform:"uppercase",color: color || "var(--halo-mint)",fontWeight:800,marginBottom:8}}>
             {title}
           </div>
 
@@ -133,51 +99,139 @@ const FormulaTip = ({ kind, color, sec, scores, tier, threshold, anchor = "right
             {formulaLines.join("\n")}
           </div>
 
-          {/* Topic / pillar table */}
-          <div style={{fontSize:9.5,letterSpacing:"0.14em",textTransform:"uppercase",color:"#8B91AB",fontWeight:700,marginBottom:6}}>
-            {kind === 'total' ? "Pillar breakdown" : `Topics in ${kind === 'E' ? 'Environment' : kind === 'S' ? 'Social' : 'Governance'} (this sector)`}
-          </div>
-          {kind === 'total' ? (
-            topicRows.map((r, i) => {
-              const pct = r.m > 0 ? Math.round(r.v / r.m * 100) : 0;
-              return (
-                <div key={i} style={{padding:"7px 0",borderTop: i ? "1px solid rgba(255,255,255,0.07)" : "none"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5}}>
-                    <span style={{display:"inline-flex",alignItems:"center",gap:6,color:"#C5C9DD"}}>
-                      <span style={{width:6,height:6,borderRadius:"50%",background:r.c}} />
-                      {r.label}
-                    </span>
-                    <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>
-                      {r.v} / {r.m} <span style={{color:"#8B91AB",fontWeight:500}}> · {pct}%</span>
-                    </span>
-                  </div>
-                  <div style={{height:3,background:"rgba(255,255,255,0.08)",borderRadius:99,overflow:"hidden",marginTop:5}}>
-                    <div style={{height:"100%",width: pct + "%", background: r.c, borderRadius:99}} />
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            topicRows.map((r, i) => (
-              <div key={r.tk} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5,padding:"6px 0",borderTop: i ? "1px solid rgba(255,255,255,0.07)" : "none"}}>
-                <span style={{color:"#C5C9DD",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",paddingRight:8}}>{r.name}</span>
-                <span style={{color:"#8B91AB",fontSize:10.5,fontFamily:"JetBrains Mono,monospace",marginRight:8}}>{r.count}Q</span>
-                <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace",minWidth:42,textAlign:"right"}}>{r.weight}pts</span>
+          {/* ── TOTAL: pillar breakdown with bars ── */}
+          {isTotal && (
+            <>
+              <div style={{fontSize:9.5,letterSpacing:"0.14em",textTransform:"uppercase",color:"#8B91AB",fontWeight:700,marginBottom:6}}>
+                Pillar breakdown
               </div>
-            ))
+              {[
+                { label: "Environment", v: scores.e, m: scores.maxE, c: "#22C28F" },
+                { label: "Social",      v: scores.s, m: scores.maxS, c: "#6B6FBF" },
+                { label: "Governance",  v: scores.g, m: scores.maxG, c: "#E8A33D" },
+              ].map((r, i) => {
+                const pct = r.m > 0 ? Math.round(r.v / r.m * 100) : 0;
+                return (
+                  <div key={i} style={{padding:"7px 0",borderTop: i ? "1px solid rgba(255,255,255,0.07)" : "none"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5}}>
+                      <span style={{display:"inline-flex",alignItems:"center",gap:6,color:"#C5C9DD"}}>
+                        <span style={{width:6,height:6,borderRadius:"50%",background:r.c}} />
+                        {r.label}
+                      </span>
+                      <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>
+                        {r.v} / {r.m} <span style={{color:"#8B91AB",fontWeight:500}}> · {pct}%</span>
+                      </span>
+                    </div>
+                    <div style={{height:3,background:"rgba(255,255,255,0.08)",borderRadius:99,overflow:"hidden",marginTop:5}}>
+                      <div style={{height:"100%",width: pct + "%", background: r.c, borderRadius:99}} />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Sum line */}
+              <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:11.5,padding:"10px 12px",margin:"10px 0 0",background:"rgba(255,255,255,0.06)",borderRadius:7,color:"#C5C9DD",lineHeight:1.6}}>
+                {scores.e} + {scores.s} + {scores.g} = <span style={{color:"white",fontWeight:700}}>{scores.total}</span> / 100
+              </div>
+
+              {/* Tier & verdict */}
+              {(() => {
+                const verdict = scores.total >= threshold ? 'PASS' : (scores.total >= threshold * 0.6 ? 'REVIEW' : 'FAIL');
+                const verdictColor = verdict === 'PASS' ? '#22C28F' : verdict === 'REVIEW' ? '#E8A33D' : '#E25C5C';
+                return (
+                  <>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"8px 0 6px",marginTop:6,borderTop:"2px solid rgba(255,255,255,0.18)"}}>
+                      <span style={{color:"#ADB3CE"}}>Tier {tier} · Pass ≥</span>
+                      <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace"}}>{threshold} / 100</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"4px 0"}}>
+                      <span style={{color:"#ADB3CE"}}>Verdict</span>
+                      <span style={{padding:"2px 9px",borderRadius:4,background:verdictColor+"33",color:verdictColor,fontWeight:800,letterSpacing:"0.1em"}}>{verdict}</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </>
           )}
 
-          {footer}
+          {/* ── PILLAR: full per-topic + per-question breakdown ── */}
+          {!isTotal && (() => {
+            const rows = topicsByPillar(kind);
+            if (rows.length === 0) {
+              return <div style={{fontSize:11.5, color:"#8B91AB", padding:"8px 0"}}>No scored topics for this sector — likely awaiting responses.</div>;
+            }
+            const totalScored = rows.reduce((s, t) => s + (t.scored || 0), 0);
+            const totalMax    = rows.reduce((s, t) => s + (t.max    || 0), 0);
+            return (
+              <>
+                <div style={{fontSize:9.5,letterSpacing:"0.14em",textTransform:"uppercase",color:"#8B91AB",fontWeight:700,marginBottom:8}}>
+                  Topic-by-topic calculation
+                </div>
+                {rows.map((t, ti) => {
+                  const items = t.items || [];
+                  const tScored = r2(t.scored);
+                  const tMax    = r2(t.max);
+                  return (
+                    <div key={t.topic} style={{marginBottom: ti < rows.length - 1 ? 12 : 4}}>
+                      {/* Topic header */}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",fontSize:11.5,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.10)"}}>
+                        <span style={{color:"white",fontWeight:700}}>{t.name}</span>
+                        <span style={{color:"#8B91AB",fontFamily:"JetBrains Mono,monospace",fontSize:10.5}}>
+                          topic_w = <span style={{color:"white",fontWeight:700}}>{t.weight}</span>
+                        </span>
+                      </div>
+                      {/* Per-question rows */}
+                      {items.map((it, ii) => {
+                        const qw = it.q.w || 0;
+                        const rp = it.respPct || 0;
+                        const qPts = r2(it.points);
+                        const qMax = r2(it.max);
+                        const unanswered = !it.answered;
+                        return (
+                          <div key={ii} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:10.5,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",opacity: unanswered ? 0.6 : 1}}>
+                            <span style={{color:"#C5C9DD",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",paddingRight:8}}>
+                              {shortQ(it.q)}
+                              {unanswered && <span style={{color:"#E8A33D",fontSize:9,marginLeft:6,letterSpacing:"0.1em"}}>· UNANS</span>}
+                            </span>
+                            <span style={{color:"#8B91AB",fontFamily:"JetBrains Mono,monospace",fontSize:10.5,marginRight:10}}>
+                              {qw} × {fmtPct(rp)}
+                            </span>
+                            <span style={{color:"white",fontWeight:700,fontFamily:"JetBrains Mono,monospace",minWidth:74,textAlign:"right",fontSize:10.5}}>
+                              {qPts} / {qMax}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {/* Topic sum line */}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"6px 0 2px",marginTop:2}}>
+                        <span style={{color: color, fontWeight:700, fontSize:10.5, letterSpacing:"0.06em"}}>
+                          {t.name} total
+                        </span>
+                        <span style={{color:"white",fontWeight:800,fontFamily:"JetBrains Mono,monospace"}}>
+                          {tScored} / {tMax} pts
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Pillar grand total */}
+                <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:11.5,padding:"10px 12px",marginTop:10,background:"rgba(255,255,255,0.06)",borderRadius:7,color:"#C5C9DD",lineHeight:1.6}}>
+                  {rows.map(t => r2(t.scored)).join(' + ')} = <span style={{color:"white",fontWeight:700}}>{r2(totalScored)}</span> / {r2(totalMax)} pts
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
     </span>
   );
 };
 
-// Back-compat: the pillar tiles below still mount this name.
-const PillarTip = ({ pillar, color, sec }) => {
+// Back-compat: pillar tiles still mount this name.
+const PillarTip = ({ pillar, color, sec, computed, scores }) => {
   const kind = pillar === 'Environment' ? 'E' : pillar === 'Social' ? 'S' : 'G';
-  return <FormulaTip kind={kind} color={color} sec={sec} />;
+  return <FormulaTip kind={kind} color={color} sec={sec} computed={computed} scores={scores} />;
 };
 
 const Report = ({ companyId, embedded }) => {
@@ -274,7 +328,7 @@ const Report = ({ companyId, embedded }) => {
               <div>
                 <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, display: "flex", alignItems: "center"}}>
                   Score
-                  {hasScore && <FormulaTip kind="total" sec={sec} scores={scores} tier={tier} threshold={threshold} anchor="left" />}
+                  {hasScore && <FormulaTip kind="total" sec={sec} scores={scores} tier={tier} threshold={threshold} computed={computed} anchor="left" />}
                 </div>
                 {hasScore ? (
                   <div className="mono" style={{fontSize: 30, fontWeight: 700, color: "#1B7C5E", letterSpacing: "-0.02em", lineHeight: 1.1}}>{scores.total} <span style={{fontSize: 14, color: "var(--halo-text-3)", fontWeight: 500}}>/100</span></div>
@@ -447,7 +501,7 @@ const Report = ({ companyId, embedded }) => {
                   <div style={{fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, flex: 1}}>
                     {p.p}
                   </div>
-                  <PillarTip pillar={p.p} color={p.c} topics={p.topics} sec={sec} />
+                  <PillarTip pillar={p.p} color={p.c} sec={sec} computed={computed} scores={scores} />
                 </div>
                 {/* Ring + score */}
                 <div style={{display: "flex", alignItems: "center", gap: 16}}>
