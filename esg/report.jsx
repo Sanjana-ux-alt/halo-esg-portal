@@ -260,14 +260,20 @@ const Report = ({ companyId, embedded }) => {
   const sec = SCORING.sectorKey(co.sector);
   const computed = SCORING.computeScores(co.id);
   const r1 = x => Math.round((x || 0) * 10) / 10;
-  // Prefer the Excel-truth values from data.jsx (co.score / e / s / g) when set,
-  // since those came directly from the Stride Ventures KPI Coverage sheet.
-  // Pillar MAX is always from computeScores (it depends on sector + active questions).
-  const hasExcelScore = co.score !== null && co.e !== null && co.s !== null && co.g !== null;
-  const scores = hasExcelScore
+  // Three data states for completed companies:
+  //   hasFullPillars : new-portco data — Excel gives us total + E/S/G + actual answers
+  //   hasTotalOnly   : old Fund II/III portco — Excel only stores the total score
+  //                    (no pillar breakdown was published for the retroactive survey)
+  //   neither        : still in-progress, fall through to computed or pending
+  const hasFullPillars = co.score !== null && co.e !== null && co.s !== null && co.g !== null;
+  const hasTotalOnly   = co.score !== null && (co.e === null || co.s === null || co.g === null);
+  const scores = hasFullPillars
     ? { e: co.e, s: co.s, g: co.g, total: co.score,
         maxE: r1(computed?.eP?.m) || 25, maxS: r1(computed?.sP?.m) || 39, maxG: r1(computed?.gP?.m) || 36 }
-    : computed
+    : hasTotalOnly
+    ? { e: null, s: null, g: null, total: co.score,
+        maxE: r1(computed?.eP?.m) || 25, maxS: r1(computed?.sP?.m) || 39, maxG: r1(computed?.gP?.m) || 36 }
+    : computed && computed.total > 0
     ? { e: r1(computed.eP.s), s: r1(computed.sP.s), g: r1(computed.gP.s), total: r1(computed.total),
         maxE: r1(computed.eP.m), maxS: r1(computed.sP.m), maxG: r1(computed.gP.m) }
     : { e: 0, s: 0, g: 0, total: 0, maxE: 25, maxS: 39, maxG: 36 };
@@ -356,7 +362,7 @@ const Report = ({ companyId, embedded }) => {
               <div>
                 <div style={{fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, display: "flex", alignItems: "center"}}>
                   Score
-                  {hasScore && <FormulaTip kind="total" sec={sec} scores={scores} tier={tier} threshold={threshold} computed={computed} anchor="left" />}
+                  {hasScore && hasFullPillars && <FormulaTip kind="total" sec={sec} scores={scores} tier={tier} threshold={threshold} computed={computed} anchor="left" />}
                 </div>
                 {hasScore ? (
                   <div className="mono" style={{fontSize: 30, fontWeight: 700, color: "#1B7C5E", letterSpacing: "-0.02em", lineHeight: 1.1}}>{scores.total} <span style={{fontSize: 14, color: "var(--halo-text-3)", fontWeight: 500}}>/100</span></div>
@@ -413,8 +419,18 @@ const Report = ({ companyId, embedded }) => {
           )}
         </div>
 
-        {/* ── E/S/G breakdown — deal + risk, only once scored ── */}
-        {(role === 'deal' || role === 'risk') && hasScore && (
+        {/* ── 'Limited data' notice for old portcos (total only, no pillar breakdown) ── */}
+        {hasTotalOnly && (
+          <div className="card" style={{padding: "14px 20px", marginBottom: 18, borderLeft: "3px solid #6B6FBF", display: "flex", alignItems: "center", gap: 12, background: "#F4F6FA"}}>
+            <Icon name="info" size={16} color="#45489B" />
+            <div style={{flex: 1, fontSize: 12.5, color: "var(--halo-text-2)", lineHeight: 1.5}}>
+              <strong style={{color: "var(--halo-text)"}}>Fund II/III retroactive survey</strong> — this portco was scored under Stride's prior methodology, which captured only the cumulative ESG score. Pillar-level breakdown and per-question audit trail are not available in the Excel.
+            </div>
+          </div>
+        )}
+
+        {/* ── E/S/G breakdown — deal + risk, only when we have pillar values ── */}
+        {(role === 'deal' || role === 'risk') && hasFullPillars && (
           <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 18}}>
             {[
               { label: "Environmental", icon: "leaf",   v: scores.e, m: scores.maxE, c: "#22C28F" },
@@ -513,7 +529,8 @@ const Report = ({ companyId, embedded }) => {
 
         {/* ── ESG TEAM: full report ── */}
         {role === 'esg' && (<>
-          {/* Pillar tiles */}
+          {/* Pillar tiles — only when we have the breakdown */}
+          {hasFullPillars && (
           <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, margin: "22px 0"}}>
             {[
               { p: "Environment", icon: "leaf",   v: scores.e, m: scores.maxE, c: "#22C28F", topics: eTopics, note: "Strong renewable mix; Scope 3 disclosure pending" },
@@ -545,8 +562,10 @@ const Report = ({ companyId, embedded }) => {
               </div>
             ))}
           </div>
+          )}
 
-          {/* Assessment Summary & Priority Improvements */}
+          {/* Assessment Summary & Priority Improvements — pillar-dependent */}
+          {hasFullPillars && (
           <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16}}>
             <div className="card card-pad" style={{borderLeft: "3px solid var(--halo-mint)"}}>
               <div style={{fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--halo-text-3)", fontWeight: 700, marginBottom: 10}}>Assessment Summary</div>
@@ -567,8 +586,9 @@ const Report = ({ companyId, embedded }) => {
               ))}
             </div>
           </div>
+          )}
 
-          {/* Peer benchmarking — real Stride portcos in the same sector */}
+          {/* Peer benchmarking — real Stride portcos in the same sector (works with total-only too) */}
           {(() => {
             const peers = window.HALO_ESG.COMPANIES
               .filter(p => p.sector === co.sector && p.score !== null);
@@ -599,12 +619,15 @@ const Report = ({ companyId, embedded }) => {
                     {sorted.map((p, i) => {
                       const isMe = p.id === co.id;
                       const d = fmtDelta(p.score);
+                      const pillarCell = (v) => v === null || v === undefined
+                        ? <span style={{color:"var(--halo-text-3)"}}>—</span>
+                        : v;
                       return (
                         <tr key={p.id} style={isMe ? {background: "#F2FBF7"} : {}}>
                           <td style={{paddingLeft: 24, fontWeight: isMe ? 700 : 500}}>{p.name}{isMe && <span style={{marginLeft: 8, fontSize: 10, color: "#1B7C5E", fontWeight: 700}}>● THIS COMPANY</span>}</td>
                           <td className="muted">{p.tier || '—'}</td>
-                          <td className="mono">{p.e}</td><td className="mono">{p.s}</td>
-                          <td className="mono">{p.g}</td><td className="mono" style={{fontWeight: 700}}>{p.score}</td>
+                          <td className="mono">{pillarCell(p.e)}</td><td className="mono">{pillarCell(p.s)}</td>
+                          <td className="mono">{pillarCell(p.g)}</td><td className="mono" style={{fontWeight: 700}}>{p.score}</td>
                           <td className="mono" style={{color: d.startsWith("+") ? "#1B7C5E" : d.startsWith("−") ? "#9F2D2D" : "var(--halo-text-3)", fontWeight: 600}}>{d}</td>
                         </tr>
                       );
@@ -615,7 +638,8 @@ const Report = ({ companyId, embedded }) => {
             );
           })()}
 
-          {/* Recommendations */}
+          {/* Recommendations — pillar-dependent (skip for old portcos) */}
+          {hasFullPillars && (
           <div className="card" style={{marginTop: 22}}>
             <div className="card-h">
               <div>
@@ -643,8 +667,9 @@ const Report = ({ companyId, embedded }) => {
               ))}
             </div>
           </div>
+          )}
 
-          {/* Sign-off */}
+          {/* Sign-off — always shown */}
           <div className="card card-pad" style={{marginTop: 22, marginBottom: 40}}>
             <h3 style={{margin: "0 0 16px", fontSize: 15}}>Approval & sign-off</h3>
             <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18}}>
