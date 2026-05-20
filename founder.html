@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ESG Founder Form</title>
+  <link rel="stylesheet" href="esg/styles.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #F4F6FA;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #0F2150;
+    }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 28px 32px 100px; }
+    .card { background: white; border-radius: 14px; padding: 22px 26px;
+            box-shadow: 0 2px 8px rgba(15,33,80,0.06); margin-bottom: 18px; }
+    .pillbar { display: flex; gap: 14px; margin-top: 14px; padding-top: 14px;
+               border-top: 1px solid #ECEEF6; font-size: 12px; color: #6B7390; }
+    .pillbar b { color: #0F2150; }
+    h1 { margin: 0; font-size: 22px; }
+    .lead { color: #6B7390; font-size: 13px; margin-top: 6px; }
+    .qtitle { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+    .qtype  { font-size: 11px; color: #8B91AB; letter-spacing: 0.1em;
+              text-transform: uppercase; }
+    .btn {
+      padding: 10px 16px; border-radius: 9px; font-size: 13px; font-weight: 600;
+      border: 1px solid #ECEEF6; background: white; cursor: pointer;
+    }
+    .btn-mint    { background: #22C28F; color: white; border-color: #22C28F; }
+    .btn-mint[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .pillyn  { padding: 12px 16px; border: 1px solid #ECEEF6; border-radius: 10px;
+               flex: 1; cursor: pointer; text-align: center; font-weight: 600; }
+    .pillyn.active { background: #F2FBF7; border-color: #22C28F; color: #1B7C5E; }
+    .opt {
+      display: flex; gap: 10px; align-items: center; padding: 11px 14px;
+      border: 1px solid #ECEEF6; border-radius: 9px; margin-bottom: 8px;
+      cursor: pointer; font-size: 13.5px;
+    }
+    .opt .dot {
+      width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #ECEEF6;
+    }
+    .opt.active { background: #F2FBF7; border-color: #22C28F; }
+    .opt.active .dot { border: 5px solid #22C28F; }
+    .progress-bar {
+      height: 8px; background: #ECEEF6; border-radius: 4px; overflow: hidden;
+    }
+    .progress-fill { height: 100%; background: #22C28F; transition: width 300ms; }
+    .err {
+      background: #FFE9E9; border: 1px solid #F0A0A0; color: #9F2D2D;
+      padding: 14px 18px; border-radius: 10px; margin-bottom: 18px;
+    }
+    .ok {
+      background: #F2FBF7; border: 1px solid #B8EDD8; color: #1B7C5E;
+      padding: 14px 18px; border-radius: 10px; margin-bottom: 18px;
+    }
+    .saving {
+      position: fixed; bottom: 18px; right: 22px;
+      background: rgba(15,33,80,0.9); color: white; padding: 8px 14px;
+      border-radius: 8px; font-size: 12px;
+    }
+  </style>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="esg/api.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback } = React;
+
+    function App() {
+      const token = window.HALO_API.tokenFromUrl();
+      const [data, setData]       = useState(null);     // server response
+      const [answers, setAnswers] = useState({});       // local map qid → value
+      const [err, setErr]         = useState(null);
+      const [saving, setSaving]   = useState(false);
+      const [submitted, setSubmitted] = useState(false);
+
+      // ── Initial load ───────────────────────────────────────
+      useEffect(() => {
+        if (!token) {
+          setErr("Missing ?token=… in the URL. Open the link from your survey invitation email.");
+          return;
+        }
+        window.HALO_API.invite.get(token)
+          .then(d => {
+            setData(d);
+            const seed = {};
+            (d.questions || []).forEach(q => {
+              if (q.answer_value !== null && q.answer_value !== undefined) {
+                seed[q.question_id] = q.answer_value;
+              }
+            });
+            setAnswers(seed);
+          })
+          .catch(e => setErr(e.message || "Failed to load form"));
+      }, [token]);
+
+      // ── Auto-save one answer ───────────────────────────────
+      const saveAnswer = useCallback((qid, value) => {
+        setAnswers(prev => ({ ...prev, [qid]: value }));
+        setSaving(true);
+        window.HALO_API.invite.answer(token, qid, value)
+          .catch(e => setErr(e.message || "Save failed"))
+          .finally(() => setSaving(false));
+      }, [token]);
+
+      // ── Submit ─────────────────────────────────────────────
+      const submit = useCallback(() => {
+        window.HALO_API.invite.submit(token)
+          .then(() => setSubmitted(true))
+          .catch(e => setErr(e.body && e.body.detail ? e.body.detail : (e.message || "Submit failed")));
+      }, [token]);
+
+      // ── Progress ───────────────────────────────────────────
+      const { answered, total, pct } = useMemo(() => {
+        if (!data) return { answered: 0, total: 0, pct: 0 };
+        const t = (data.questions || []).length;
+        const a = (data.questions || []).filter(q => {
+          const v = answers[q.question_id];
+          if (v === undefined || v === null) return false;
+          if (Array.isArray(v) && v.length === 0) return false;
+          if (typeof v === "object" && Object.keys(v).length === 0) return false;
+          return true;
+        }).length;
+        return { answered: a, total: t, pct: t ? Math.round(a / t * 100) : 0 };
+      }, [data, answers]);
+
+      // ── Render ─────────────────────────────────────────────
+      if (err) return <div className="wrap"><div className="err">{err}</div></div>;
+      if (!data) return <div className="wrap"><div className="card">Loading…</div></div>;
+      if (submitted) return (
+        <div className="wrap">
+          <div className="ok">
+            <h2 style={{margin:0}}>✓ Submitted</h2>
+            <div style={{marginTop:6,fontSize:13}}>
+              Thanks! Your responses have been sent to the Stride ESG team.
+            </div>
+          </div>
+        </div>
+      );
+
+      return (
+        <div className="wrap">
+          <div className="card">
+            <h1>ESG Response Form{data.company_name ? " — " + data.company_name : ""}</h1>
+            <div className="lead">
+              Hi! Please answer the questions below. Your progress auto-saves.
+            </div>
+            <div className="pillbar">
+              <span>Cycle: <b>{data.cycle}</b></span>
+              <span>Status: <b>{data.status}</b></span>
+              <span>Deadline: <b>{new Date(data.deadline_at).toLocaleDateString()}</b></span>
+              <span style={{marginLeft:"auto"}}>Answered: <b>{answered}/{total} ({pct}%)</b></span>
+            </div>
+            <div style={{marginTop:12}}>
+              <div className="progress-bar"><div className="progress-fill" style={{width: pct + "%"}}/></div>
+            </div>
+          </div>
+
+          {(data.questions || []).map((q, i) => (
+            <Question
+              key={q.question_id}
+              q={q}
+              index={i + 1}
+              value={answers[q.question_id]}
+              onChange={v => saveAnswer(q.question_id, v)}
+            />
+          ))}
+
+          <div className="card" style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+            <div style={{fontSize:13, color:"#6B7390"}}>
+              {pct < 100
+                ? `${total - answered} questions remaining`
+                : "All questions answered — ready to submit"}
+            </div>
+            <button
+              className="btn btn-mint"
+              onClick={submit}>
+              Submit for review
+            </button>
+          </div>
+
+          {saving && <div className="saving">Saving…</div>}
+        </div>
+      );
+    }
+
+    // ── Per-question renderer ──────────────────────────────────
+    function Question({ q, index, value, onChange }) {
+      return (
+        <div className="card">
+          <div className="qtype">Q{index} · {q.q_type} · {q.pillar}{q.required ? " · required" : ""}</div>
+          <div className="qtitle" style={{marginTop:6}}>{q.prompt}</div>
+          <Input q={q} value={value} onChange={onChange} />
+        </div>
+      );
+    }
+
+    function Input({ q, value, onChange }) {
+      if (q.q_type === "yes_no") {
+        const cur = value && value.bool === true ? "Yes" : value && value.bool === false ? "No" : null;
+        return (
+          <div style={{display:"flex", gap:10}}>
+            <div className={"pillyn" + (cur === "Yes" ? " active" : "")}
+                 onClick={() => onChange({ bool: true })}>Yes</div>
+            <div className={"pillyn" + (cur === "No" ? " active" : "")}
+                 onClick={() => onChange({ bool: false })}>No</div>
+          </div>
+        );
+      }
+      if (q.q_type === "number" || q.q_type === "slider") {
+        const num = value && typeof value.number !== "undefined" ? value.number : "";
+        return (
+          <div style={{display:"flex", alignItems:"center", gap:10, border:"1px solid #ECEEF6",
+                       borderRadius:9, padding:"0 14px", maxWidth:340}}>
+            <input
+              type="number" step="any" value={num}
+              onChange={e => onChange({ number: e.target.value === "" ? null : parseFloat(e.target.value) })}
+              placeholder="0"
+              style={{flex:1, border:"none", outline:"none", padding:"11px 0",
+                      fontFamily:"JetBrains Mono, monospace", fontSize:14}}
+            />
+            {q.unit && <span style={{fontSize:12, color:"#8B91AB"}}>{q.unit}</span>}
+          </div>
+        );
+      }
+      if (q.q_type === "single_select") {
+        const opts = (q.options || []).map(o => typeof o === "string" ? { value: o, label: o } : o);
+        const cur  = value && value.option;
+        return (
+          <div>
+            {opts.map(o => (
+              <div key={o.value || o.label}
+                   className={"opt" + (cur === (o.value || o.label) ? " active" : "")}
+                   onClick={() => onChange({ option: o.value || o.label })}>
+                <div className="dot"/><span>{o.label || o.value}</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      if (q.q_type === "multi_select") {
+        const opts = (q.options || []).map(o => typeof o === "string" ? { value: o, label: o } : o);
+        const cur = (value && value.options) || [];
+        const toggle = (val) => {
+          const next = cur.includes(val) ? cur.filter(x => x !== val) : [...cur, val];
+          onChange({ options: next });
+        };
+        return (
+          <div>
+            {opts.map(o => {
+              const val = o.value || o.label;
+              const active = cur.includes(val);
+              return (
+                <div key={val}
+                     className={"opt" + (active ? " active" : "")}
+                     onClick={() => toggle(val)}>
+                  <div className="dot" style={active ? {background:"#22C28F", borderColor:"#22C28F"} : {}}/>
+                  <span>{o.label || o.value}</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      // text fallback
+      return (
+        <input
+          type="text"
+          value={(value && value.text) || ""}
+          onChange={e => onChange({ text: e.target.value })}
+          style={{width:"100%", padding:"10px 12px", border:"1px solid #ECEEF6",
+                  borderRadius:9, fontSize:13}}
+        />
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
