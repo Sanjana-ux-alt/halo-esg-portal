@@ -16,6 +16,9 @@
 <body>
   <div id="root"></div>
 
+  <!-- api.js must load first so window.HALO_API is defined before any component runs -->
+  <script src="esg/api.js"></script>
+
   <!-- Order matters: data.jsx defines globals (HALO_ESG, Icon, StatusPill, Ring) first -->
   <script type="text/babel" src="esg/data.jsx"></script>
   <script type="text/babel" src="esg/scoring.jsx"></script>
